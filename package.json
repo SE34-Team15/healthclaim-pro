@@ -1,0 +1,21 @@
+{
+  "name": "healthclaim-pro-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise Medical Insurance Claim and Intelligent Settlement Platform",
+  "scripts": {
+    "dev:backend": "pnpm --filter backend start:dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev": "pnpm --filter \"@healthclaim/*\" --parallel dev",
+    "build": "pnpm -r build",
+    "test": "pnpm --filter backend test",
+    "test:cov": "pnpm --filter backend test:cov",
+    "lint": "pnpm -r lint",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "typescript": "^5.7.3"
+  }
+}

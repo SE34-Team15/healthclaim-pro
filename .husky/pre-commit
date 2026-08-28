@@ -1,0 +1,15 @@
+echo "🔍 Running HealthClaim Pro automated pre-commit verification..."
+
+# 1. Typecheck and build shared contracts
+pnpm --filter "@healthclaim/shared" build || {
+  echo "❌ Shared contract build failed. Aborting commit."
+  exit 1
+}
+
+# 2. Run backend TDD test suites
+pnpm --filter backend test || {
+  echo "❌ Backend unit tests failed. Aborting commit."
+  exit 1
+}
+
+echo "✅ All pre-commit checks passed successfully!"
