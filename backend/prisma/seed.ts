@@ -191,7 +191,79 @@ async function main() {
     },
   });
 
-  // 4. Initial Seed Audit Log
+  // 4. Seed Dynamic Compliance Rules (AST format)
+  console.log('Seeding compliance rule AST definitions...');
+
+  // Rule 1: Hospital Qualification (Grade must be valid)
+  await prisma.complianceRule.upsert({
+    where: { code: 'RULE_HOSPITAL_GRADE' },
+    update: {},
+    create: {
+      code: 'RULE_HOSPITAL_GRADE',
+      name: 'Hospital Qualification Requirement',
+      description: 'Medical services must be rendered by accredited Grade A, Grade 3A, or certified Specialist institutions.',
+      priority: 10,
+      astDefinition: {
+        type: 'COMPARISON',
+        field: 'hospitalGrade',
+        operator: 'IN',
+        value: ['GRADE_A', 'GRADE_3A', 'PUBLIC_HOSPITAL', 'SPECIALIST_CLINIC'],
+      },
+      isActive: true,
+    },
+  });
+
+  // Rule 2: Single Dental Claim Cap ($1,000 threshold)
+  await prisma.complianceRule.upsert({
+    where: { code: 'RULE_DENTAL_CAP' },
+    update: {},
+    create: {
+      code: 'RULE_DENTAL_CAP',
+      name: 'Dental Single Claim Cap',
+      description: 'Individual dental reimbursement claims must not exceed $1,000 without prior specialized authorization.',
+      priority: 20,
+      astDefinition: {
+        type: 'LOGICAL',
+        operator: 'OR',
+        children: [
+          {
+            type: 'COMPARISON',
+            field: 'category',
+            operator: 'NOT_EQUALS',
+            value: 'DENTAL',
+          },
+          {
+            type: 'COMPARISON',
+            field: 'totalAmount',
+            operator: 'LESS_EQUAL',
+            value: 1000,
+          },
+        ],
+      },
+      isActive: true,
+    },
+  });
+
+  // Rule 3: Minimum Claim Validity & Invoice Items Required
+  await prisma.complianceRule.upsert({
+    where: { code: 'RULE_MIN_AMOUNT' },
+    update: {},
+    create: {
+      code: 'RULE_MIN_AMOUNT',
+      name: 'Minimum Claim Value Validation',
+      description: 'Total claim amount must be strictly greater than $0 and have positive line-item totals.',
+      priority: 30,
+      astDefinition: {
+        type: 'COMPARISON',
+        field: 'totalAmount',
+        operator: 'GREATER_THAN',
+        value: 0,
+      },
+      isActive: true,
+    },
+  });
+
+  // 5. Initial Seed Audit Log
   await prisma.auditLog.create({
     data: {
       action: 'SYSTEM_INITIALIZATION',
@@ -200,6 +272,7 @@ async function main() {
         initializedRoles: Object.values(Role),
         seededUsersCount: 6,
         seededTiersCount: 3,
+        seededRulesCount: 3,
         fiscalYear: currentYear,
       },
     },

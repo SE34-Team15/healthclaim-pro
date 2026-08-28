@@ -73,4 +73,34 @@ describe('AuditService (TDD)', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0].action).toBe('UPDATE_USER_ROLE');
   });
+
+  it('should export audit logs in standard CSV spreadsheet format with BOM', async () => {
+    mockPrismaService.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'log-1',
+        action: 'SUBMIT_CLAIM',
+        targetResource: 'CLAIM',
+        targetResourceId: 'claim-123',
+        details: { amount: 500 },
+        ipAddress: '192.168.1.1',
+        createdAt: new Date('2026-08-28T00:00:00.000Z'),
+        actor: {
+          id: 'usr-1',
+          email: 'david@healthclaim.pro',
+          firstName: 'David',
+          lastName: 'Miller',
+          role: 'EMPLOYEE',
+        },
+      },
+    ]);
+
+    const csvOutput = await auditService.exportAuditLogsCsv('SUBMIT_CLAIM');
+
+    expect(csvOutput.startsWith('\uFEFF')).toBe(true);
+    expect(csvOutput).toContain('Timestamp (ISO)');
+    expect(csvOutput).toContain('SUBMIT_CLAIM');
+    expect(csvOutput).toContain('David Miller');
+    expect(csvOutput).toContain('david@healthclaim.pro');
+    expect(csvOutput).toContain('192.168.1.1');
+  });
 });

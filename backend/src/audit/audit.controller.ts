@@ -1,4 +1,5 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Res, Header } from '@nestjs/common';
+import { Response } from 'express';
 import { AuditService } from './audit.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -29,5 +30,23 @@ export class AuditController {
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
     });
+  }
+
+  /**
+   * Export audit logs as CSV spreadsheet
+   */
+  @Get('export/csv')
+  @Roles(UserRole.SECURITY_AUDITOR, UserRole.SYSTEM_ADMIN)
+  async exportAuditLogsCsv(
+    @Query('action') action: string | undefined,
+    @Res() res: Response,
+  ) {
+    const csvData = await this.auditService.exportAuditLogsCsv(action);
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `healthclaim_audit_logs_${dateStr}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(csvData);
   }
 }

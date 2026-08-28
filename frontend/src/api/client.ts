@@ -30,10 +30,10 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login if unauthorized
       localStorage.removeItem('healthclaim_token');
       localStorage.removeItem('healthclaim_user');
-      if (window.location.pathname !== '/login') {
+      // If unauthorized and not already on /login, smoothly redirect to /login
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
     }

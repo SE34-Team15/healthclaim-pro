@@ -20,6 +20,20 @@ export const UserProfileSchema = z.object({
 export type UserProfile = z.infer<typeof UserProfileSchema>;
 
 /**
+ * Self Update Profile Schema (Settings)
+ */
+export const UpdateProfileSchema = z.object({
+  firstName: z.string().min(1, 'First name is required').optional(),
+  lastName: z.string().min(1, 'Last name is required').optional(),
+  email: z.string().email('Invalid email address').optional(),
+  department: z.string().optional(),
+  currentPassword: z.string().optional(),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters').optional(),
+});
+
+export type UpdateProfileDto = z.infer<typeof UpdateProfileSchema>;
+
+/**
  * Update User Role Schema (Admin only)
  */
 export const UpdateUserRoleSchema = z.object({

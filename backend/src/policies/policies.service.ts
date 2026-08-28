@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateBenefitTier,
+  UpdateBenefitTier,
   AssignUserPolicy,
 } from '@healthclaim/shared';
 
@@ -73,6 +74,87 @@ export class PoliciesService {
       defaultDeductible: Number(tier.defaultDeductible),
       defaultCoPayRate: Number(tier.defaultCoPayRate),
     };
+  }
+
+  /**
+   * Update an existing benefit tier (Admin only)
+   */
+  async updateBenefitTier(tierId: string, dto: UpdateBenefitTier, actorId: string) {
+    const existing = await this.prisma.benefitTier.findUnique({ where: { id: tierId } });
+    if (!existing) {
+      throw new NotFoundException('Benefit Tier not found');
+    }
+
+    const updated = await this.prisma.benefitTier.update({
+      where: { id: tierId },
+      data: {
+        ...(dto.name ? { name: dto.name.trim() } : {}),
+        ...(dto.description !== undefined ? { description: dto.description?.trim() || null } : {}),
+        ...(dto.annualLimit !== undefined ? { annualLimit: dto.annualLimit } : {}),
+        ...(dto.defaultDeductible !== undefined ? { defaultDeductible: dto.defaultDeductible } : {}),
+        ...(dto.defaultCoPayRate !== undefined ? { defaultCoPayRate: dto.defaultCoPayRate } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'UPDATE_BENEFIT_TIER',
+        targetResource: 'BENEFIT_TIER',
+        targetResourceId: tierId,
+        details: {
+          code: existing.code,
+          changes: dto,
+        },
+      },
+    });
+
+    return {
+      ...updated,
+      annualLimit: Number(updated.annualLimit),
+      defaultDeductible: Number(updated.defaultDeductible),
+      defaultCoPayRate: Number(updated.defaultCoPayRate),
+    };
+  }
+
+  /**
+   * Delete or archive a benefit tier (Admin only)
+   */
+  async deleteBenefitTier(tierId: string, actorId: string) {
+    const tier = await this.prisma.benefitTier.findUnique({
+      where: { id: tierId },
+      include: {
+        userQuotas: true,
+      },
+    });
+
+    if (!tier) {
+      throw new NotFoundException('Benefit Tier not found');
+    }
+
+    if (tier.userQuotas && tier.userQuotas.length > 0) {
+      throw new BadRequestException(
+        `Cannot delete tier "${tier.name}" because ${tier.userQuotas.length} employee quota(s) are currently assigned to it. Please reassign those employees first or set the tier to Inactive.`,
+      );
+    }
+
+    await this.prisma.benefitTier.delete({ where: { id: tierId } });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'DELETE_BENEFIT_TIER',
+        targetResource: 'BENEFIT_TIER',
+        targetResourceId: tierId,
+        details: {
+          code: tier.code,
+          name: tier.name,
+        },
+      },
+    });
+
+    return { message: `Benefit tier "${tier.name}" deleted successfully` };
   }
 
   /**

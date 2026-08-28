@@ -78,4 +78,63 @@ export class AuditService {
       totalPages: Math.ceil(total / pageSize),
     };
   }
+
+  /**
+   * Generate CSV format for audit log export
+   */
+  async exportAuditLogsCsv(action?: string): Promise<string> {
+    const where: any = {};
+    if (action && action !== 'ALL') where.action = action;
+
+    const logs = await this.prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        actor: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    const headers = [
+      'Timestamp (ISO)',
+      'Event Action',
+      'Actor Name',
+      'Actor Email',
+      'Actor Role',
+      'Target Resource',
+      'Target Resource ID',
+      'IP Origin',
+      'Details Snapshot',
+    ];
+
+    const escapeCsv = (str: string | undefined | null) => {
+      if (str === undefined || str === null) return '""';
+      const clean = String(str).replace(/"/g, '""');
+      return `"${clean}"`;
+    };
+
+    const rows = logs.map((log) => [
+      escapeCsv(log.createdAt.toISOString()),
+      escapeCsv(log.action),
+      escapeCsv(log.actor ? `${log.actor.firstName} ${log.actor.lastName}` : 'System Kernel'),
+      escapeCsv(log.actor?.email || 'system'),
+      escapeCsv(log.actor?.role || 'SYSTEM'),
+      escapeCsv(log.targetResource),
+      escapeCsv(log.targetResourceId || 'N/A'),
+      escapeCsv(log.ipAddress || '127.0.0.1'),
+      escapeCsv(log.details ? JSON.stringify(log.details) : ''),
+    ]);
+
+    // Prepend UTF-8 BOM (\uFEFF) so Excel opens multilingual CSV flawlessly
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+
+    return csvContent;
+  }
 }

@@ -7,10 +7,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@healthclaim/shared': path.resolve(__dirname, '../shared/src/index.ts'),
     },
   },
   server: {
     port: 5173,
+    host: true,
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

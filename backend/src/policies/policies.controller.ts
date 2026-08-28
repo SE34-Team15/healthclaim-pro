@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -15,6 +17,8 @@ import {
   UserRole,
   CreateBenefitTier,
   CreateBenefitTierSchema,
+  UpdateBenefitTier,
+  UpdateBenefitTierSchema,
   AssignUserPolicy,
   AssignUserPolicySchema,
 } from '@healthclaim/shared';
@@ -43,6 +47,31 @@ export class PoliciesController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.policiesService.createBenefitTier(dto, actor.id);
+  }
+
+  /**
+   * Update an existing benefit tier (Admin only)
+   */
+  @Patch('tiers/:id')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  async updateTier(
+    @Param('id') tierId: string,
+    @Body(new ZodValidationPipe(UpdateBenefitTierSchema)) dto: UpdateBenefitTier,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.policiesService.updateBenefitTier(tierId, dto, actor.id);
+  }
+
+  /**
+   * Delete a benefit tier (Admin only)
+   */
+  @Delete('tiers/:id')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  async deleteTier(
+    @Param('id') tierId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.policiesService.deleteBenefitTier(tierId, actor.id);
   }
 
   /**

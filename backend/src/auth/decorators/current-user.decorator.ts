@@ -9,8 +9,9 @@ export interface AuthenticatedUser {
 }
 
 export const CurrentUser = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext): AuthenticatedUser => {
+  (data: string | undefined, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
-    return request.user;
+    const user = request.user;
+    return data && user ? user[data] : user;
   },
 );

@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { BadgePercent, Plus, Check, AlertCircle, ShieldCheck, X } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Checkbox } from '../components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '../components/ui/dialog';
+import { toast } from 'sonner';
+import { Plus, Layers, Edit3, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface BenefitTierItem {
   id: string;
@@ -16,18 +27,30 @@ interface BenefitTierItem {
 export const BenefitTiersPage: React.FC = () => {
   const [tiers, setTiers] = useState<BenefitTierItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Form State
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [description, setDescription] = useState('');
-  const [annualLimit, setAnnualLimit] = useState(5000);
-  const [defaultDeductible, setDefaultDeductible] = useState(100);
-  const [defaultCoPayRate, setDefaultCoPayRate] = useState(0.8);
+  // Create Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createCode, setCreateCode] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [createAnnualLimit, setCreateAnnualLimit] = useState(5000);
+  const [createDefaultDeductible, setCreateDefaultDeductible] = useState(100);
+  const [createDefaultCoPayRate, setCreateDefaultCoPayRate] = useState(0.8);
   const [creating, setCreating] = useState(false);
+
+  // Edit Modal State
+  const [editingTier, setEditingTier] = useState<BenefitTierItem | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editAnnualLimit, setEditAnnualLimit] = useState(5000);
+  const [editDefaultDeductible, setEditDefaultDeductible] = useState(100);
+  const [editDefaultCoPayRate, setEditDefaultCoPayRate] = useState(0.8);
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [updating, setUpdating] = useState(false);
+
+  // Delete State
+  const [deletingTier, setDeletingTier] = useState<BenefitTierItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchTiers = async () => {
     setLoading(true);
@@ -35,7 +58,7 @@ export const BenefitTiersPage: React.FC = () => {
       const data = await apiClient.get<any, BenefitTierItem[]>('/policies/tiers');
       setTiers(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch benefit tiers');
+      toast.error(err.message || 'Failed to fetch benefit tiers');
     } finally {
       setLoading(false);
     }
@@ -48,245 +71,397 @@ export const BenefitTiersPage: React.FC = () => {
   const handleCreateTier = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
-    setError(null);
     try {
       await apiClient.post('/policies/tiers', {
-        name,
-        code: code.toUpperCase().trim(),
-        description: description || undefined,
-        annualLimit: Number(annualLimit),
-        defaultDeductible: Number(defaultDeductible),
-        defaultCoPayRate: Number(defaultCoPayRate),
+        name: createName,
+        code: createCode.toUpperCase().trim(),
+        description: createDescription || undefined,
+        annualLimit: Number(createAnnualLimit),
+        defaultDeductible: Number(createDefaultDeductible),
+        defaultCoPayRate: Number(createDefaultCoPayRate),
         isActive: true,
       });
-      setIsModalOpen(false);
-      setSuccessMsg(`Benefit tier "${name}" created successfully!`);
-      setTimeout(() => setSuccessMsg(null), 3000);
-      setName('');
-      setCode('');
-      setDescription('');
+      setIsCreateModalOpen(false);
+      toast.success(`Benefit tier "${createName}" created successfully`);
+      setCreateName('');
+      setCreateCode('');
+      setCreateDescription('');
       fetchTiers();
     } catch (err: any) {
-      setError(err.message || 'Failed to create benefit tier');
+      toast.error(err.message || 'Failed to create benefit tier');
     } finally {
       setCreating(false);
     }
   };
 
+  const handleOpenEdit = (tier: BenefitTierItem) => {
+    setEditingTier(tier);
+    setEditName(tier.name);
+    setEditDescription(tier.description || '');
+    setEditAnnualLimit(tier.annualLimit);
+    setEditDefaultDeductible(tier.defaultDeductible);
+    setEditDefaultCoPayRate(tier.defaultCoPayRate);
+    setEditIsActive(tier.isActive);
+  };
+
+  const handleUpdateTier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTier) return;
+
+    setUpdating(true);
+    try {
+      await apiClient.patch(`/policies/tiers/${editingTier.id}`, {
+        name: editName.trim(),
+        description: editDescription.trim() || undefined,
+        annualLimit: Number(editAnnualLimit),
+        defaultDeductible: Number(editDefaultDeductible),
+        defaultCoPayRate: Number(editDefaultCoPayRate),
+        isActive: editIsActive,
+      });
+
+      setEditingTier(null);
+      toast.success(`Benefit tier "${editName}" updated successfully`);
+      fetchTiers();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update benefit tier');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteTier = async () => {
+    if (!deletingTier) return;
+
+    setDeleting(true);
+    try {
+      const res = await apiClient.delete<any, { message: string }>(
+        `/policies/tiers/${deletingTier.id}`,
+      );
+      setDeletingTier(null);
+      toast.success(res.message || 'Benefit tier deleted successfully');
+      fetchTiers();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete benefit tier');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-900">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
-            <BadgePercent className="h-6 w-6 text-purple-600" />
+          <h2 className="text-xl font-bold tracking-tight text-[#0a2540] flex items-center gap-2">
+            <Layers className="h-5 w-5 text-slate-700" />
             Corporate Medical Benefit Tiers
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Configure enterprise medical plans, annual coverage limits, deductibles, and co-payment reimbursement ratios.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Configure enterprise healthcare plans, annual coverage limits, deductibles, and co-payment ratios.
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-md shadow-purple-600/20"
-        >
+        <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
           <Plus className="h-4 w-4" />
-          Create New Plan Tier
-        </button>
+          <span>Create Plan Tier</span>
+        </Button>
       </div>
 
-      {successMsg && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
-          <Check className="h-4 w-4 text-emerald-600" />
-          <span>{successMsg}</span>
-        </div>
-      )}
-      {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-rose-600" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Tiers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Grid of Benefit Tiers */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {loading ? (
           <div className="col-span-3 text-center py-12 text-slate-400 text-xs">
-            Loading benefit tier configurations...
+            Loading benefit tiers...
           </div>
         ) : (
           tiers.map((tier) => (
             <div
               key={tier.id}
-              className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col justify-between hover:border-purple-300 transition-all"
+              className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between"
             >
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 text-slate-800">
                     {tier.code}
                   </span>
-                  <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500"></span> Active
-                  </span>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    {tier.isActive ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#00a88f] bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                        <CheckCircle2 className="h-3 w-3" /> Active
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mt-1">{tier.name}</h3>
-                <p className="text-xs text-slate-500 mt-1 min-h-[32px]">
-                  {tier.description || 'Corporate healthcare policy tier'}
+
+                <h3 className="text-base font-bold text-[#0a2540] mt-1">{tier.name}</h3>
+                <p className="text-xs text-slate-500 mt-1 min-h-[32px] leading-relaxed">
+                  {tier.description || 'Corporate medical plan tier'}
                 </p>
 
-                <div className="mt-6 pt-4 border-t border-slate-100 space-y-3 text-xs">
+                <div className="mt-5 pt-4 border-t border-slate-100 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 font-medium">Annual Limit:</span>
-                    <span className="font-extrabold text-slate-900 text-sm">
+                    <span className="font-bold text-[#0a2540] text-sm font-mono">
                       ${tier.annualLimit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-500 font-medium">Co-Pay Coverage:</span>
-                    <span className="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
+                    <span className="text-slate-500 font-medium">Co-Pay Subsidy:</span>
+                    <span className="font-semibold text-[#00a88f] font-mono">
                       {(tier.defaultCoPayRate * 100).toFixed(0)}%
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500 font-medium">Annual Deductible:</span>
-                    <span className="font-semibold text-slate-800">
+                    <span className="font-medium text-slate-800 font-mono">
                       ${tier.defaultDeductible.toFixed(2)}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
-                <span>Auto-Applies in Actuarial Pipeline</span>
-                <ShieldCheck className="h-4 w-4 text-purple-600" />
+              {/* Action Controls */}
+              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOpenEdit(tier)}
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  <span>Edit</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeletingTier(tier)}
+                  className="h-8 text-xs gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-slate-200"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete</span>
+                </Button>
               </div>
             </div>
           ))
         )}
       </div>
 
-      {/* Create Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                <BadgePercent className="h-5 w-5 text-purple-600" />
-                Create Corporate Benefit Tier
-              </h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                <X className="h-5 w-5" />
-              </button>
+      {/* Create Dialog */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent>
+          <DialogHeader className="pr-6">
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-4 w-4" /> Create Corporate Benefit Tier
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateTier} className="space-y-3.5 mt-2 text-xs">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Plan Name</label>
+              <Input
+                type="text"
+                required
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="e.g. Executive Leadership Plan"
+              />
             </div>
 
-            <form onSubmit={handleCreateTier} className="space-y-3 mt-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Code Identifier</label>
+              <Input
+                type="text"
+                required
+                value={createCode}
+                onChange={(e) => setCreateCode(e.target.value.toUpperCase())}
+                placeholder="TIER_EXECUTIVE"
+                className="uppercase font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+              <Input
+                type="text"
+                value={createDescription}
+                onChange={(e) => setCreateDescription(e.target.value)}
+                placeholder="Eligibility details..."
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Plan Tier Name
-                </label>
-                <input
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Annual Limit ($)</label>
+                <Input
+                  type="number"
+                  required
+                  min={1}
+                  value={createAnnualLimit}
+                  onChange={(e) => setCreateAnnualLimit(parseFloat(e.target.value))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Deductible ($)</label>
+                <Input
+                  type="number"
+                  required
+                  min={0}
+                  value={createDefaultDeductible}
+                  onChange={(e) => setCreateDefaultDeductible(parseFloat(e.target.value))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Co-Pay (0-1)</label>
+                <Input
+                  type="number"
+                  required
+                  step="0.05"
+                  min={0}
+                  max={1}
+                  value={createDefaultCoPayRate}
+                  onChange={(e) => setCreateDefaultCoPayRate(parseFloat(e.target.value))}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3">
+              <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creating}>
+                {creating ? 'Saving...' : 'Create Tier'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingTier} onOpenChange={(open) => !open && setEditingTier(null)}>
+        <DialogContent>
+          <DialogHeader className="pr-6">
+            <DialogTitle className="flex items-center gap-2">
+              <Edit3 className="h-4 w-4" /> Edit Benefit Tier: {editingTier?.code}
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingTier && (
+            <form onSubmit={handleUpdateTier} className="space-y-3.5 mt-2 text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Plan Name</label>
+                <Input
                   type="text"
                   required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Executive Leadership Plan"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Unique Code Identifier
-                </label>
-                <input
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+                <Input
                   type="text"
-                  required
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="TIER_EXECUTIVE"
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 uppercase font-mono"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Plan details and eligibility criteria..."
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Annual Limit ($)
-                  </label>
-                  <input
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Annual Limit ($)</label>
+                  <Input
                     type="number"
                     required
                     min={1}
-                    value={annualLimit}
-                    onChange={(e) => setAnnualLimit(parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    value={editAnnualLimit}
+                    onChange={(e) => setEditAnnualLimit(parseFloat(e.target.value))}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Deductible ($)
-                  </label>
-                  <input
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Deductible ($)</label>
+                  <Input
                     type="number"
                     required
                     min={0}
-                    value={defaultDeductible}
-                    onChange={(e) => setDefaultDeductible(parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    value={editDefaultDeductible}
+                    onChange={(e) => setEditDefaultDeductible(parseFloat(e.target.value))}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Co-Pay (0 - 1)
-                  </label>
-                  <input
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Co-Pay (0-1)</label>
+                  <Input
                     type="number"
                     required
                     step="0.05"
                     min={0}
                     max={1}
-                    value={defaultCoPayRate}
-                    onChange={(e) => setDefaultCoPayRate(parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    value={editDefaultCoPayRate}
+                    onChange={(e) => setEditDefaultCoPayRate(parseFloat(e.target.value))}
                   />
                 </div>
               </div>
 
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="px-4 py-2 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 shadow-md"
-                >
-                  {creating ? 'Saving...' : 'Create Tier'}
-                </button>
+              <div className="flex items-center gap-2 pt-2">
+                <Checkbox
+                  id="editIsActive"
+                  checked={editIsActive}
+                  onCheckedChange={(checked) => setEditIsActive(checked === true)}
+                />
+                <label htmlFor="editIsActive" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                  Active policy tier (eligible for employee assignments)
+                </label>
               </div>
+
+              <DialogFooter className="pt-3">
+                <Button type="button" variant="outline" onClick={() => setEditingTier(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updating}>
+                  {updating ? 'Updating...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
             </form>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deletingTier} onOpenChange={(open) => !open && setDeletingTier(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="pr-6">
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="h-5 w-5" /> Delete Benefit Tier
+            </DialogTitle>
+          </DialogHeader>
+
+          {deletingTier && (
+            <div className="space-y-3 text-xs text-slate-600 mt-2">
+              <p>
+                Are you sure you want to delete <span className="font-bold text-slate-900">{deletingTier.name}</span> ({deletingTier.code})?
+              </p>
+              <p className="text-[11px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                Note: Plans that are currently assigned to active employees cannot be deleted to preserve actuarial accounting records.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="pt-3">
+            <Button variant="outline" onClick={() => setDeletingTier(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteTier}
+              disabled={deleting}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              {deleting ? 'Deleting...' : 'Confirm Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

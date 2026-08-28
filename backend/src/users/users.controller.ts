@@ -7,7 +7,6 @@ import {
   Body,
   Query,
   UseGuards,
-  UsePipes,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,6 +21,8 @@ import {
   UpdateUserStatusSchema,
   AdminCreateUser,
   AdminCreateUserSchema,
+  UpdateProfileDto,
+  UpdateProfileSchema,
 } from '@healthclaim/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
@@ -36,6 +37,17 @@ export class UsersController {
   @Get('me')
   async getMyProfile(@CurrentUser() user: AuthenticatedUser) {
     return this.usersService.getCurrentUserProfile(user.id);
+  }
+
+  /**
+   * Update self profile settings (Name, email, department, password)
+   */
+  @Patch('me')
+  async updateMyProfile(
+    @CurrentUser('id') userId: string,
+    @Body(new ZodValidationPipe(UpdateProfileSchema)) dto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateMyProfile(userId, dto);
   }
 
   /**

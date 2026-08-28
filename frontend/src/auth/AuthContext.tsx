@@ -42,26 +42,41 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfileWithQuota | null>(() => {
-    const saved = localStorage.getItem('healthclaim_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('healthclaim_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      localStorage.removeItem('healthclaim_user');
+      return null;
+    }
   });
-  const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem('healthclaim_token'),
-  );
+
+  const [token, setToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('healthclaim_token');
+    } catch {
+      return null;
+    }
+  });
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const refreshProfile = useCallback(async () => {
+    const currentToken = localStorage.getItem('healthclaim_token');
+    if (!currentToken) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      if (!localStorage.getItem('healthclaim_token')) {
-        setUser(null);
-        return;
-      }
       const profile = await apiClient.get<any, UserProfileWithQuota>('/users/me');
       setUser(profile);
       localStorage.setItem('healthclaim_user', JSON.stringify(profile));
     } catch (error) {
-      console.error('Failed to refresh user profile:', error);
+      console.warn('Failed to refresh user profile:', error);
       setUser(null);
+      setToken(null);
       localStorage.removeItem('healthclaim_token');
       localStorage.removeItem('healthclaim_user');
     } finally {

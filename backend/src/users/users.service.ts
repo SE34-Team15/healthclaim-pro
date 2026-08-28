@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,6 +13,7 @@ import {
   UpdateUserRole,
   UpdateUserStatus,
   AdminCreateUser,
+  UpdateProfileDto,
 } from '@healthclaim/shared';
 
 @Injectable()
@@ -81,6 +83,63 @@ export class UsersService {
           }
         : null,
     };
+  }
+
+  /**
+   * Update self profile settings (Name, email, department, password)
+   */
+  async updateMyProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User profile not found');
+    }
+
+    const updateData: any = {};
+
+    if (dto.firstName) updateData.firstName = dto.firstName.trim();
+    if (dto.lastName) updateData.lastName = dto.lastName.trim();
+    if (dto.department !== undefined) updateData.department = dto.department?.trim() || null;
+
+    if (dto.email && dto.email.toLowerCase().trim() !== user.email) {
+      const targetEmail = dto.email.toLowerCase().trim();
+      const emailConflict = await this.prisma.user.findUnique({ where: { email: targetEmail } });
+      if (emailConflict) {
+        throw new ConflictException('An account with this email address already exists');
+      }
+      updateData.email = targetEmail;
+      updateData.isEmailVerified = false; // Reset verification if email changes
+    }
+
+    // Password change verification
+    if (dto.newPassword) {
+      if (!dto.currentPassword) {
+        throw new BadRequestException('Current password is required to change password');
+      }
+      const isMatch = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+      if (!isMatch) {
+        throw new UnauthorizedException('Incorrect current password');
+      }
+      updateData.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        action: 'UPDATE_SELF_PROFILE',
+        targetResource: 'USER',
+        targetResourceId: userId,
+        details: {
+          updatedFields: Object.keys(updateData).filter((k) => k !== 'passwordHash'),
+        },
+      },
+    });
+
+    return this.getCurrentUserProfile(userId);
   }
 
   /**

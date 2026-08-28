@@ -23,6 +23,27 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum ClaimCategory {
+  CONSULTATION
+  MEDICATION
+  SURGERY
+  HOSPITALIZATION
+  DENTAL
+  OPTICAL
+  HEALTH_SCREENING
+  OTHER
+}
+
+enum ClaimStatus {
+  SUBMITTED
+  AUTO_VALIDATED
+  FLAGGED_REVIEW
+  OFFICER_APPROVED
+  OFFICER_REJECTED
+  FINANCE_APPROVED
+  SETTLED
+}
+
 model User {
   id              String            @id @default(uuid())
   email           String            @unique
@@ -35,6 +56,7 @@ model User {
   isEmailVerified Boolean           @default(false)
   
   quotas          UserPolicyQuota[]
+  claims          Claim[]
   auditLogs       AuditLog[]
   
   createdAt       DateTime          @default(now())
@@ -77,6 +99,88 @@ model UserPolicyQuota {
   @@unique([userId, fiscalYear])
   @@index([userId])
   @@index([benefitTierId])
+}
+
+model Claim {
+  id                 String              @id @default(uuid())
+  claimNumber        String              @unique
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fiscalYear         Int
+  category           ClaimCategory
+  hospitalName       String
+  hospitalGrade      String?             @default("GRADE_A")
+  invoiceDate        DateTime
+  totalAmount        Decimal             @db.Decimal(12, 2)
+  deductibleCovered  Decimal             @default(0) @db.Decimal(12, 2)
+  coPayRate          Decimal             @db.Decimal(5, 4)
+  approvedAmount     Decimal             @default(0) @db.Decimal(12, 2)
+  outOfPocketAmount  Decimal             @default(0) @db.Decimal(12, 2)
+  status             ClaimStatus         @default(SUBMITTED)
+  notes              String?
+  
+  items              ClaimItem[]
+  ruleEvaluations    RuleEvaluationLog[]
+  
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([claimNumber])
+  @@index([fiscalYear])
+}
+
+model ClaimItem {
+  id              String        @id @default(uuid())
+  claimId         String
+  claim           Claim         @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  description     String
+  category        ClaimCategory
+  unitPrice       Decimal       @db.Decimal(12, 2)
+  quantity        Int           @default(1)
+  totalPrice      Decimal       @db.Decimal(12, 2)
+  isEligible      Boolean       @default(true)
+  rejectionReason String?
+  
+  createdAt       DateTime      @default(now())
+
+  @@index([claimId])
+}
+
+model ComplianceRule {
+  id             String              @id @default(uuid())
+  code           String              @unique
+  name           String
+  description    String?
+  priority       Int                 @default(100)
+  astDefinition  Json
+  isActive       Boolean             @default(true)
+  
+  evaluationLogs RuleEvaluationLog[]
+  
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model RuleEvaluationLog {
+  id             String         @id @default(uuid())
+  claimId        String
+  claim          Claim          @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  ruleId         String?
+  rule           ComplianceRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  ruleCode       String
+  ruleName       String
+  isPassed       Boolean
+  reason         String?
+  details        Json?
+  evaluatedAt    DateTime       @default(now())
+
+  @@index([claimId])
+  @@index([ruleId])
 }
 
 model AuditLog {

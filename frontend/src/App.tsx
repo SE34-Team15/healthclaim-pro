@@ -5,12 +5,18 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { SubmitClaimPage } from './pages/SubmitClaimPage';
+import { MyClaimsPage } from './pages/MyClaimsPage';
+import { ClaimAuditQueuePage } from './pages/ClaimAuditQueuePage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { BenefitTiersPage } from './pages/BenefitTiersPage';
+import { ComplianceRulesPage } from './pages/ComplianceRulesPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { SettingsPage } from './pages/SettingsPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { UnauthorizedPage } from './pages/UnauthorizedPage';
 import { UserRole } from '@healthclaim/shared';
+import { Toaster } from './components/ui/sonner';
 
 export const App: React.FC = () => {
   return (
@@ -27,6 +33,27 @@ export const App: React.FC = () => {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+
+              {/* Employee Claim Submission & History */}
+              <Route path="/claims/submit" element={<SubmitClaimPage />} />
+              <Route path="/claims/my-claims" element={<MyClaimsPage />} />
+
+              {/* Claim Officer & Admin Compliance Engine & Audit Queue */}
+              <Route
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      UserRole.CLAIM_OFFICER,
+                      UserRole.FINANCE_MANAGER,
+                      UserRole.SYSTEM_ADMIN,
+                    ]}
+                  />
+                }
+              >
+                <Route path="/admin/audit-queue" element={<ClaimAuditQueuePage />} />
+                <Route path="/admin/rules" element={<ComplianceRulesPage />} />
+              </Route>
 
               {/* System Admin Specific Routes */}
               <Route element={<ProtectedRoute allowedRoles={[UserRole.SYSTEM_ADMIN]} />}>
@@ -48,9 +75,10 @@ export const App: React.FC = () => {
           </Route>
 
           {/* Catch-all fallback */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
+      <Toaster position="top-right" richColors closeButton={false} duration={3000} />
     </AuthProvider>
   );
 };

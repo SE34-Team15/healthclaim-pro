@@ -260,4 +260,49 @@ describe('UsersService (TDD)', () => {
       ).rejects.toThrow(ConflictException);
     });
   });
+
+  describe('updateMyProfile', () => {
+    it('should update name and department successfully', async () => {
+      mockPrismaService.user.findUnique
+        .mockResolvedValueOnce({
+          id: 'usr-1',
+          email: 'emp@test.com',
+          firstName: 'Old',
+          lastName: 'Name',
+        })
+        .mockResolvedValueOnce({
+          id: 'usr-1',
+          email: 'emp@test.com',
+          firstName: 'New',
+          lastName: 'Name',
+          role: UserRole.EMPLOYEE,
+          status: UserStatus.ACTIVE,
+          department: 'Product Design',
+          isEmailVerified: true,
+          quotas: [],
+        });
+
+      mockPrismaService.user.update.mockResolvedValue({
+        id: 'usr-1',
+        firstName: 'New',
+      });
+
+      const updated = await service.updateMyProfile('usr-1', {
+        firstName: 'New',
+        department: 'Product Design',
+      });
+
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'usr-1' },
+          data: expect.objectContaining({
+            firstName: 'New',
+            department: 'Product Design',
+          }),
+        }),
+      );
+      expect(mockPrismaService.auditLog.create).toHaveBeenCalled();
+      expect(updated.firstName).toBe('New');
+    });
+  });
 });

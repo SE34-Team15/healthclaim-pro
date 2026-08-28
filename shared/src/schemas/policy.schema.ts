@@ -34,6 +34,20 @@ export const CreateBenefitTierSchema = z.object({
 export type CreateBenefitTier = z.infer<typeof CreateBenefitTierSchema>;
 
 /**
+ * Update Benefit Tier Request Schema
+ */
+export const UpdateBenefitTierSchema = z.object({
+  name: z.string().min(1, 'Tier name is required').optional(),
+  description: z.string().optional(),
+  annualLimit: z.number().positive('Annual limit must be greater than 0').optional(),
+  defaultDeductible: z.number().nonnegative('Deductible cannot be negative').optional(),
+  defaultCoPayRate: z.number().min(0).max(1, 'Co-pay rate must be between 0 and 1').optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type UpdateBenefitTier = z.infer<typeof UpdateBenefitTierSchema>;
+
+/**
  * User Policy Quota & Balance Schema
  */
 export const UserPolicyQuotaSchema = z.object({
