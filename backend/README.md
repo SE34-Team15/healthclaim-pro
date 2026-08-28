@@ -2,26 +2,35 @@
 
 Backend service and domain engine for the HealthClaim Pro Enterprise Medical Insurance Claim and Intelligent Settlement Platform.
 
-## Core Architectural Components & Design Patterns
-- Dynamic Compliance Rule Engine (Composite & Specification Pattern)
-- Dynamic Actuarial Reimbursement Pipeline (Strategy & Builder Pattern)
-- Rule Priority Dispatcher (Chain of Responsibility Pattern)
-- Claim Lifecycle State Machine (State Pattern)
-- Zero-Trust Asymmetric Envelope Encryption (Decorator & Adapter Pattern)
-- Transactional Event Notification (Observer & Adapter Pattern)
-- Settlement & Audit Reporting (Template Method Pattern)
+## Technology Stack
+- Runtime: Node.js with TypeScript
+- Framework: NestJS
+- Database: PostgreSQL with Prisma
+- Storage: S3 Compatible Storage Adapter
+- Email: SMTP Protocol Adapter
+- Validation: Zod
+- Testing: Vitest for TDD unit and integration tests
 
-## Development Setup
+## Core Design Patterns
+- Dynamic Compliance Rule Engine: Composite & Specification Pattern
+- Dynamic Actuarial Reimbursement Pipeline: Strategy & Builder Pattern
+- Rule Priority Dispatcher: Chain of Responsibility Pattern
+- Claim Lifecycle State Machine: State Pattern
+- Zero-Trust Asymmetric Envelope Encryption: Decorator & Adapter Pattern
+- Transactional Event Notification: Observer & Adapter Pattern
+- Settlement & Audit Reporting: Template Method Pattern
+
+## Development
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Run database migrations
-npx prisma migrate dev
+pnpm prisma migrate dev
 
 # Run TDD test suites with coverage
-npm run test:cov
+pnpm test:cov
 
 # Start development server
-npm run start:dev
+pnpm start:dev
 ```

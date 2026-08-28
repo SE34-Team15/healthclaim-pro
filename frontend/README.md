@@ -1,21 +1,23 @@
 # HealthClaim Pro - Frontend
 
-Frontend application for the HealthClaim Pro Enterprise Medical Insurance Claim and Intelligent Settlement Platform.
+Client-side application for the HealthClaim Pro Enterprise Medical Insurance Claim and Intelligent Settlement Platform.
 
 ## Technology Stack
-- Framework: React 18 / Vite
+- Bundler: Vite
+- UI Framework: React 18
+- Router: React Router v6
 - Styling: Tailwind CSS & Shadcn/UI
-- Form & Validation: React Hook Form & Zod
-- HTTP Client: Axios / Fetch
+- Forms: React Hook Form & Zod
+- Data Fetching: TanStack Query / Axios
 
-## Development Setup
+## Development
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Start local development server
-npm run dev
+pnpm dev
 
 # Build for production
-npm run build
+pnpm build
 ```
