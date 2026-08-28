@@ -1,15 +1,32 @@
 echo "🔍 Running HealthClaim Pro automated pre-commit verification..."
 
-# 1. Typecheck and build shared contracts
+# 1. Auto-generate latest Prisma client types from schema.prisma
+pnpm --filter backend prisma:generate || {
+  echo "❌ Prisma generate failed. Aborting commit."
+  exit 1
+}
+
+# 2. Build and compile @healthclaim/shared (Zod schemas & DTO types)
 pnpm --filter "@healthclaim/shared" build || {
   echo "❌ Shared contract build failed. Aborting commit."
   exit 1
 }
 
-# 2. Run backend TDD test suites
+# 3. Full TypeScript typecheck across backend and frontend
+pnpm --filter backend exec tsc --noEmit || {
+  echo "❌ Backend typecheck failed. Aborting commit."
+  exit 1
+}
+
+pnpm --filter frontend exec tsc --noEmit || {
+  echo "❌ Frontend typecheck failed. Aborting commit."
+  exit 1
+}
+
+# 4. Run backend TDD unit test suites (Vitest)
 pnpm --filter backend test || {
   echo "❌ Backend unit tests failed. Aborting commit."
   exit 1
 }
 
-echo "✅ All pre-commit checks passed successfully!"
+echo "✅ All pre-commit generators, typechecks, and tests passed successfully!"
