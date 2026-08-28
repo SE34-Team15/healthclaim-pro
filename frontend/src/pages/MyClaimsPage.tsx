@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import { ClaimResponseDto, ClaimStatus } from '@healthclaim/shared';
+import { ClaimResponseDto, ClaimStatus, ReceiptAttachmentDto } from '@healthclaim/shared';
 import { Button } from '../components/ui/button';
 import {
   Dialog,
@@ -19,12 +19,23 @@ import {
   Clock,
   ChevronRight,
   ShieldCheck,
+  File,
+  Image as ImageIcon,
+  Eye,
+  Download,
+  Lock,
 } from 'lucide-react';
 
 export const MyClaimsPage: React.FC = () => {
   const [claims, setClaims] = useState<ClaimResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClaim, setSelectedClaim] = useState<ClaimResponseDto | null>(null);
+  const [previewingAttachment, setPreviewingAttachment] = useState<{
+    id: string;
+    fileName: string;
+    mimeType: string;
+    blobUrl?: string;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const fetchClaims = async () => {
@@ -49,6 +60,55 @@ export const MyClaimsPage: React.FC = () => {
     }
   }, [loading]);
 
+  const handleOpenAttachmentPreview = async (attachment: ReceiptAttachmentDto) => {
+    const token = localStorage.getItem('healthclaim_token');
+    try {
+      const res = await fetch(`/api/v1/attachments/${attachment.id}/preview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to decrypt attachment preview');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      setPreviewingAttachment({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        blobUrl,
+      });
+    } catch (err: any) {
+      toast.error(err.message || 'Could not decrypt preview');
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: ReceiptAttachmentDto) => {
+    const token = localStorage.getItem('healthclaim_token');
+    try {
+      const res = await fetch(`/api/v1/attachments/${attachment.id}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to download attachment');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = attachment.fileName;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success(`Downloaded '${attachment.fileName}'`);
+    } catch (err: any) {
+      toast.error(err.message || 'Download failed');
+    }
+  };
+
+  const handleClosePreview = () => {
+    if (previewingAttachment?.blobUrl) {
+      URL.revokeObjectURL(previewingAttachment.blobUrl);
+    }
+    setPreviewingAttachment(null);
+  };
+
   const getStatusBadge = (status: ClaimStatus) => {
     switch (status) {
       case ClaimStatus.AUTO_VALIDATED:
@@ -60,7 +120,7 @@ export const MyClaimsPage: React.FC = () => {
       case ClaimStatus.FLAGGED_REVIEW:
         return (
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-            <AlertCircle className="h-3 w-3" /> Flagged for Review
+            <AlertCircle className="h-3 w-3" /> Under Review
           </span>
         );
       case ClaimStatus.OFFICER_APPROVED:
@@ -80,123 +140,115 @@ export const MyClaimsPage: React.FC = () => {
       case ClaimStatus.SUBMITTED:
       default:
         return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
-            <Clock className="h-3 w-3" /> Pending Review
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+            <Clock className="h-3 w-3" /> Submitted
           </span>
         );
     }
   };
 
   return (
-    <div ref={containerRef} className="space-y-6 text-slate-900">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 anim-header">
+    <div ref={containerRef} className="space-y-6 text-slate-900 max-w-6xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-[#0a2540] flex items-center gap-2">
             <Receipt className="h-5 w-5 text-slate-700" />
-            Medical Claims History
+            My Reimbursement Claims
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Track submitted reimbursement requests and payout status.
+            Track real-time approval states, actuarial deduction summaries, and encrypted invoices.
           </p>
         </div>
 
-        <Link to="/claims/submit">
-          <Button className="gap-2">
-            <FilePlus2 className="h-4 w-4" />
-            <span>Submit New Claim</span>
-          </Button>
-        </Link>
+        <Button asChild size="sm" className="gap-2 font-semibold shadow-xs">
+          <Link to="/claims/submit">
+            <FilePlus2 className="h-4 w-4" /> File New Claim
+          </Link>
+        </Button>
       </div>
 
-      {/* Claims Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden anim-card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50/75 border-b border-slate-200 text-slate-500 font-semibold tracking-wider uppercase text-[11px]">
-                <th className="py-3.5 px-5">Claim Number</th>
-                <th className="py-3.5 px-4">Institution / Date</th>
-                <th className="py-3.5 px-4">Category</th>
-                <th className="py-3.5 px-4">Claimed / Approved</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-5 text-right">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
-                    Loading claims...
-                  </td>
-                </tr>
-              ) : claims.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
-                    No medical claims submitted yet.
-                  </td>
-                </tr>
-              ) : (
-                claims.map((claim) => (
-                  <tr
-                    key={claim.id}
-                    className="hover:bg-slate-50/80 transition-colors duration-150 cursor-pointer group"
-                    onClick={() => setSelectedClaim(claim)}
-                  >
-                    <td className="py-3.5 px-5 font-mono font-bold text-[#0a2540]">
-                      {claim.claimNumber}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <p className="font-semibold text-slate-900">{claim.hospitalName}</p>
-                      <p className="text-[11px] text-slate-400 font-mono">
-                        {new Date(claim.invoiceDate).toLocaleDateString()}
-                      </p>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="font-mono text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                        {claim.category}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <p className="font-mono font-bold text-[#00a88f] text-sm">
-                        ${claim.approvedAmount.toFixed(2)}
-                      </p>
-                      <p className="text-[11px] text-slate-400 font-mono">
-                        Total: ${claim.totalAmount.toFixed(2)}
-                      </p>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {getStatusBadge(claim.status)}
-                    </td>
-                    <td className="py-3.5 px-5 text-right">
-                      <button className="p-1 text-slate-400 group-hover:text-[#0a2540] transition-colors">
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {loading ? (
+        <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200/80">
+          Loading your reimbursement records...
         </div>
-      </div>
+      ) : claims.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center space-y-3">
+          <Receipt className="h-10 w-10 text-slate-300 mx-auto" />
+          <h3 className="font-bold text-slate-800 text-sm">No claims submitted yet</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            You have not submitted any medical claims for the current fiscal year.
+          </p>
+          <Button asChild size="sm" variant="outline" className="mt-2">
+            <Link to="/claims/submit">Submit First Claim</Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="divide-y divide-slate-100">
+            {claims.map((claim) => (
+              <div
+                key={claim.id}
+                onClick={() => setSelectedClaim(claim)}
+                className="p-5 hover:bg-slate-50/80 transition-colors cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="font-mono font-bold text-xs text-[#0a2540]">
+                      {claim.claimNumber}
+                    </span>
+                    {getStatusBadge(claim.status)}
+                    <span className="text-[11px] font-mono font-semibold px-2 py-0.5 bg-slate-100 text-slate-700 rounded">
+                      {claim.category}
+                    </span>
+                    {claim.attachments && claim.attachments.length > 0 && (
+                      <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                        <Lock className="h-2.5 w-2.5" /> {claim.attachments.length} receipt{claim.attachments.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600 font-medium">
+                    {claim.hospitalName} • Invoice Date: {new Date(claim.invoiceDate).toLocaleDateString()}
+                  </p>
+                </div>
 
-      {/* Claim Detail Dialog */}
+                <div className="flex items-center gap-6 self-end md:self-center">
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Claimed / Approved</span>
+                    <span className="font-mono text-xs text-slate-500">
+                      ${claim.totalAmount.toFixed(2)} →{' '}
+                      <strong className="text-sm font-bold text-[#00a88f] text-slate-900">
+                        ${claim.approvedAmount.toFixed(2)}
+                      </strong>
+                    </span>
+                  </div>
+
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Claim Detail Modal */}
       <Dialog open={!!selectedClaim} onOpenChange={(open) => !open && setSelectedClaim(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader className="pr-6">
-            <div className="flex items-center justify-between gap-3">
-              <DialogTitle className="text-sm font-bold text-[#0a2540]">
-                Claim {selectedClaim?.claimNumber}
-              </DialogTitle>
-              {selectedClaim && getStatusBadge(selectedClaim.status)}
-            </div>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-[#0a2540]">
+              <Receipt className="h-5 w-5 text-indigo-600" />
+              Claim Voucher: {selectedClaim?.claimNumber}
+            </DialogTitle>
           </DialogHeader>
 
           {selectedClaim && (
             <div className="space-y-4 text-xs mt-2">
-              <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200/60">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200/60">
                 <div>
-                  <span className="text-slate-400 font-medium">Institution:</span>
+                  <span className="text-slate-400 font-medium">Status:</span>
+                  <div className="mt-1">{getStatusBadge(selectedClaim.status)}</div>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Provider:</span>
                   <p className="font-semibold text-slate-900 mt-0.5">{selectedClaim.hospitalName}</p>
                 </div>
                 <div>
@@ -206,6 +258,61 @@ export const MyClaimsPage: React.FC = () => {
                   </p>
                 </div>
               </div>
+
+              {/* Attached Receipts */}
+              {selectedClaim.attachments && selectedClaim.attachments.length > 0 && (
+                <div>
+                  <h4 className="font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
+                    <Lock className="h-3 w-3 text-indigo-600" /> Attached Medical Receipts (AES-256 Encrypted)
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedClaim.attachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between gap-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {att.mimeType.includes('pdf') ? (
+                            <File className="h-4 w-4 text-rose-500 shrink-0" />
+                          ) : (
+                            <ImageIcon className="h-4 w-4 text-indigo-500 shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-900 truncate" title={att.fileName}>
+                              {att.fileName}
+                            </p>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {(att.fileSize / 1024).toFixed(0)} KB
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenAttachmentPreview(att)}
+                            className="h-7 px-2 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50"
+                          >
+                            <Eye className="h-3 w-3 mr-1" /> View
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownloadAttachment(att)}
+                            className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700"
+                            title="Download file"
+                          >
+                            <Download className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Line Items */}
               <div>
@@ -261,6 +368,36 @@ export const MyClaimsPage: React.FC = () => {
                   <span className="font-mono">${selectedClaim.outOfPocketAmount.toFixed(2)}</span>
                 </div>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Attachment Decrypted Preview Modal */}
+      <Dialog open={!!previewingAttachment} onOpenChange={(open) => !open && handleClosePreview()}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader className="pr-6">
+            <DialogTitle className="flex items-center gap-2 text-sm font-bold text-slate-900">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              Decrypted Receipt: {previewingAttachment?.fileName}
+            </DialogTitle>
+          </DialogHeader>
+
+          {previewingAttachment?.blobUrl && (
+            <div className="p-2 rounded-xl bg-slate-900/5 flex items-center justify-center max-h-[70vh] overflow-auto">
+              {previewingAttachment.mimeType.includes('pdf') ? (
+                <iframe
+                  src={previewingAttachment.blobUrl}
+                  title={previewingAttachment.fileName}
+                  className="w-full h-[65vh] rounded-lg border-0"
+                />
+              ) : (
+                <img
+                  src={previewingAttachment.blobUrl}
+                  alt={previewingAttachment.fileName}
+                  className="max-w-full max-h-[65vh] rounded-lg object-contain shadow-md"
+                />
+              )}
             </div>
           )}
         </DialogContent>

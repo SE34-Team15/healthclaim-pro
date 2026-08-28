@@ -274,7 +274,7 @@ export class UsersService {
     const previousStatus = user.status;
     const updated = await this.prisma.user.update({
       where: { id: targetUserId },
-      data: { status: dto.status },
+      data: { status: dto.status as any },
     });
 
     await this.prisma.auditLog.create({

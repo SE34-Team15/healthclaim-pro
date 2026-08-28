@@ -167,6 +167,7 @@ export class ClaimsService {
         include: {
           items: true,
           ruleEvaluations: true,
+          attachments: true,
           user: {
             select: {
               id: true,
@@ -178,6 +179,19 @@ export class ClaimsService {
           },
         },
       });
+
+      // Link uploaded receipt attachments to claim
+      if (dto.attachmentIds && dto.attachmentIds.length > 0 && tx.receiptAttachment) {
+        await tx.receiptAttachment.updateMany({
+          where: {
+            id: { in: dto.attachmentIds },
+            userId,
+          },
+          data: {
+            claimId: createdClaim.id,
+          },
+        });
+      }
 
       return createdClaim;
     });
@@ -195,6 +209,7 @@ export class ClaimsService {
         approvedAmount: calculation.reimbursedAmount,
         status: initialStatus,
         allRulesPassed: ruleEvaluation.allPassed,
+        attachmentsCount: dto.attachmentIds?.length || 0,
       },
       ipAddress,
     });
@@ -211,6 +226,7 @@ export class ClaimsService {
       include: {
         items: true,
         ruleEvaluations: true,
+        attachments: true,
         user: {
           select: {
             id: true,
@@ -224,22 +240,29 @@ export class ClaimsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return claims.map((c) => this.mapToDto(c));
+    return claims.map((claim) => this.mapToDto(claim));
   }
 
   /**
-   * Retrieves all claims for administrative review with optional status filtering.
+   * Retrieves all enterprise claims with optional status/search filters (Claim Officers & Admins).
    */
-  async getAllClaims(status?: ClaimStatus, search?: string): Promise<ClaimResponseDto[]> {
+  async getAllClaims(
+    status?: ClaimStatus,
+    search?: string,
+  ): Promise<ClaimResponseDto[]> {
     const where: any = {};
+
     if (status) {
       where.status = status;
     }
+
     if (search) {
       where.OR = [
         { claimNumber: { contains: search, mode: 'insensitive' } },
         { hospitalName: { contains: search, mode: 'insensitive' } },
         { user: { email: { contains: search, mode: 'insensitive' } } },
+        { user: { firstName: { contains: search, mode: 'insensitive' } } },
+        { user: { lastName: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -248,6 +271,7 @@ export class ClaimsService {
       include: {
         items: true,
         ruleEvaluations: true,
+        attachments: true,
         user: {
           select: {
             id: true,
@@ -261,18 +285,22 @@ export class ClaimsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return claims.map((c) => this.mapToDto(c));
+    return claims.map((claim) => this.mapToDto(claim));
   }
 
   /**
-   * Retrieves a single claim by ID with role check.
+   * Retrieves a single claim by its unique ID.
    */
-  async getClaimById(id: string, user: { id: string; role: UserRole }): Promise<ClaimResponseDto> {
+  async getClaimById(
+    id: string,
+    user: { id: string; role: UserRole },
+  ): Promise<ClaimResponseDto> {
     const claim = await this.prisma.claim.findUnique({
       where: { id },
       include: {
         items: true,
         ruleEvaluations: true,
+        attachments: true,
         user: {
           select: {
             id: true,
@@ -333,6 +361,16 @@ export class ClaimsService {
         reason: r.reason,
         details: r.details,
       })),
+      attachments: claim.attachments?.map((a: any) => ({
+        id: a.id,
+        claimId: a.claimId,
+        fileName: a.fileName,
+        fileSize: a.fileSize,
+        mimeType: a.mimeType,
+        checksum: a.checksum,
+        createdAt: a.createdAt.toISOString(),
+        previewUrl: `/api/v1/attachments/${a.id}/preview`,
+      })) || [],
       createdAt: claim.createdAt.toISOString(),
       updatedAt: claim.updatedAt.toISOString(),
     };

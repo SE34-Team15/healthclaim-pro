@@ -42,9 +42,21 @@ export const CreateClaimSchema = z.object({
   hospitalGrade: z.string().optional().default('GRADE_A'),
   notes: z.string().optional(),
   items: z.array(ClaimItemSchema).min(1, 'At least one claim item is required'),
+  attachmentIds: z.array(z.string().uuid()).optional().default([]),
 });
 
 export type CreateClaimRequest = z.infer<typeof CreateClaimSchema>;
+
+export interface ReceiptAttachmentDto {
+  id: string;
+  claimId?: string | null;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  checksum: string;
+  createdAt: string;
+  previewUrl?: string;
+}
 
 export interface ActuarialCalculationPreviewDto {
   totalClaimedAmount: number;
@@ -95,6 +107,7 @@ export interface ClaimResponseDto {
   notes?: string | null;
   items: ClaimItem[];
   ruleEvaluations?: RuleEvaluationResult[];
+  attachments?: ReceiptAttachmentDto[];
   createdAt: string;
   updatedAt: string;
 }

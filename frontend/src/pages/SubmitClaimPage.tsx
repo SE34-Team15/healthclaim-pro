@@ -16,6 +16,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import { Calendar } from '../components/ui/calendar';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -23,6 +29,7 @@ import {
   ClaimCategory,
   ClaimItem,
   ActuarialCalculationPreviewDto,
+  ReceiptAttachmentDto,
 } from '@healthclaim/shared';
 import gsap from 'gsap';
 import {
@@ -37,12 +44,19 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
+  UploadCloud,
+  File,
+  Image as ImageIcon,
+  Eye,
+  Lock,
+  Loader2,
 } from 'lucide-react';
 
 export const SubmitClaimPage: React.FC = () => {
   const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [category, setCategory] = useState<ClaimCategory>(ClaimCategory.CONSULTATION);
   const [hospitalName, setHospitalName] = useState('');
@@ -61,6 +75,16 @@ export const SubmitClaimPage: React.FC = () => {
       isEligible: true,
     },
   ]);
+
+  // Uploaded receipt attachments
+  const [attachments, setAttachments] = useState<ReceiptAttachmentDto[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [previewingAttachment, setPreviewingAttachment] = useState<{
+    id: string;
+    fileName: string;
+    mimeType: string;
+    blobUrl?: string;
+  } | null>(null);
 
   const [preview, setPreview] = useState<ActuarialCalculationPreviewDto | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -154,6 +178,87 @@ export const SubmitClaimPage: React.FC = () => {
     setItems(updated);
   };
 
+  // Handle Receipt Upload
+  const handleFilesSelected = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    const token = localStorage.getItem('healthclaim_token');
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`File '${file.name}' exceeds maximum 10MB limit.`);
+        continue;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('/api/v1/attachments/upload', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.message || 'Upload failed');
+        }
+
+        const data: ReceiptAttachmentDto = await response.json();
+        setAttachments((prev) => [...prev, data]);
+        toast.success(`'${file.name}' securely encrypted (AES-256) and attached.`);
+      } catch (err: any) {
+        toast.error(err.message || `Failed to upload '${file.name}'`);
+      }
+    }
+
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDeleteAttachment = async (id: string, fileName: string) => {
+    try {
+      await apiClient.delete(`/attachments/${id}`);
+      setAttachments((prev) => prev.filter((a) => a.id !== id));
+      toast.success(`Removed attachment '${fileName}'.`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove attachment');
+    }
+  };
+
+  const handleOpenAttachmentPreview = async (attachment: ReceiptAttachmentDto) => {
+    const token = localStorage.getItem('healthclaim_token');
+    try {
+      const res = await fetch(`/api/v1/attachments/${attachment.id}/preview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to decrypt attachment preview');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      setPreviewingAttachment({
+        id: attachment.id,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        blobUrl,
+      });
+    } catch (err: any) {
+      toast.error(err.message || 'Could not decrypt preview');
+    }
+  };
+
+  const handleClosePreview = () => {
+    if (previewingAttachment?.blobUrl) {
+      URL.revokeObjectURL(previewingAttachment.blobUrl);
+    }
+    setPreviewingAttachment(null);
+  };
+
   const handleSubmitClaim = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hospitalName.trim()) {
@@ -184,6 +289,7 @@ export const SubmitClaimPage: React.FC = () => {
         invoiceDate: invoiceDate.toISOString().split('T')[0],
         notes: notes || undefined,
         items: formattedItems,
+        attachmentIds: attachments.map((a) => a.id),
       });
 
       toast.success(`Claim ${response.claimNumber} submitted successfully!`);
@@ -202,7 +308,7 @@ export const SubmitClaimPage: React.FC = () => {
   );
 
   return (
-    <div ref={containerRef} className="space-y-6 text-slate-900 max-w-5xl mx-auto">
+    <div ref={containerRef} className="space-y-6 text-slate-900 max-w-5xl mx-auto pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -433,6 +539,119 @@ export const SubmitClaimPage: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Medical Receipts & Invoices Attachment Upload Card */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4 anim-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-indigo-600" /> Proof of Payment & Receipts (Encrypted)
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Upload clinic receipts, hospital bills, or prescription receipts. Files are encrypted with AES-256-GCM.
+                </p>
+              </div>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                multiple
+                accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
+                onChange={(e) => handleFilesSelected(e.target.files)}
+                className="hidden"
+              />
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="gap-1.5 h-8 text-xs font-semibold text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+              >
+                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />}
+                <span>{uploading ? 'Encrypting...' : 'Upload File'}</span>
+              </Button>
+            </div>
+
+            {/* Drag & Drop Visual Area */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleFilesSelected(e.dataTransfer.files);
+              }}
+              className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/20 rounded-xl p-5 text-center cursor-pointer transition-colors"
+            >
+              <div className="flex flex-col items-center justify-center gap-1.5">
+                <UploadCloud className="h-7 w-7 text-indigo-500" />
+                <p className="text-xs font-semibold text-slate-700">
+                  Click or drag hospital receipts here
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  Supports PNG, JPG, WEBP, PDF up to 10MB per file
+                </p>
+              </div>
+            </div>
+
+            {/* List of Uploaded & Encrypted Attachments */}
+            {attachments.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <p className="text-[11px] font-bold text-slate-600">Attached Documents ({attachments.length}):</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {attachments.map((att) => (
+                    <div
+                      key={att.id}
+                      className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {att.mimeType.includes('pdf') ? (
+                          <File className="h-5 w-5 text-rose-500 shrink-0" />
+                        ) : (
+                          <ImageIcon className="h-5 w-5 text-indigo-500 shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-900 truncate" title={att.fileName}>
+                            {att.fileName}
+                          </p>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                            <span>{(att.fileSize / 1024).toFixed(0)} KB</span>
+                            <span className="text-emerald-600 flex items-center gap-0.5">
+                              <ShieldCheck className="h-3 w-3" /> AES-256
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenAttachmentPreview(att)}
+                          className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600"
+                          title="Preview decrypted receipt"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteAttachment(att.id, att.fileName)}
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
+                          title="Remove attachment"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Column: Real-time Actuarial Fee Calculator & Submission */}
@@ -513,6 +732,36 @@ export const SubmitClaimPage: React.FC = () => {
           </div>
         </div>
       </form>
+
+      {/* Decrypted Receipt Preview Modal */}
+      <Dialog open={!!previewingAttachment} onOpenChange={(open) => !open && handleClosePreview()}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader className="pr-6">
+            <DialogTitle className="flex items-center gap-2 text-sm font-bold text-slate-900">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              Decrypted Receipt: {previewingAttachment?.fileName}
+            </DialogTitle>
+          </DialogHeader>
+
+          {previewingAttachment?.blobUrl && (
+            <div className="p-2 rounded-xl bg-slate-900/5 flex items-center justify-center max-h-[70vh] overflow-auto">
+              {previewingAttachment.mimeType.includes('pdf') ? (
+                <iframe
+                  src={previewingAttachment.blobUrl}
+                  title={previewingAttachment.fileName}
+                  className="w-full h-[65vh] rounded-lg border-0"
+                />
+              ) : (
+                <img
+                  src={previewingAttachment.blobUrl}
+                  alt={previewingAttachment.fileName}
+                  className="max-w-full max-h-[65vh] rounded-lg object-contain shadow-md"
+                />
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

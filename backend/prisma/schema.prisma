@@ -1,5 +1,3 @@
-// HealthClaim Pro - Database Schema (PostgreSQL)
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -19,8 +17,8 @@ enum Role {
 
 enum UserStatus {
   ACTIVE
-  INACTIVE
   SUSPENDED
+  DEACTIVATED
 }
 
 enum ClaimCategory {
@@ -58,6 +56,7 @@ model User {
   quotas          UserPolicyQuota[]
   claims          Claim[]
   auditLogs       AuditLog[]
+  attachments     ReceiptAttachment[]
   
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
@@ -121,6 +120,7 @@ model Claim {
   
   items              ClaimItem[]
   ruleEvaluations    RuleEvaluationLog[]
+  attachments        ReceiptAttachment[]
   
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
@@ -146,6 +146,30 @@ model ClaimItem {
   createdAt       DateTime      @default(now())
 
   @@index([claimId])
+}
+
+model ReceiptAttachment {
+  id           String   @id @default(uuid())
+  claimId      String?
+  claim        Claim?   @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileSize     Int
+  mimeType     String
+  storageKey   String   @unique
+  encryptedDek String?  // AES-256-GCM DEK encrypted with Master RSA/ECC Key
+  iv           String?  // 12-byte initialization vector hex
+  authTag      String?  // 16-byte GCM authentication tag hex
+  checksum     String   // SHA-256 integrity hash
+  magicHeader  String?  @default("HC_ENC") // Custom binary magic header
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([claimId])
+  @@index([userId])
+  @@index([storageKey])
 }
 
 model ComplianceRule {
