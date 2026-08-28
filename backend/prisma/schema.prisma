@@ -40,6 +40,7 @@ enum ClaimStatus {
   OFFICER_REJECTED
   FINANCE_APPROVED
   SETTLED
+  CANCELLED
 }
 
 model User {
@@ -116,6 +117,9 @@ model Claim {
   approvedAmount     Decimal             @default(0) @db.Decimal(12, 2)
   outOfPocketAmount  Decimal             @default(0) @db.Decimal(12, 2)
   status             ClaimStatus         @default(SUBMITTED)
+  statusReason       String?
+  reviewedBy         String?
+  reviewedAt         DateTime?
   notes              String?
   
   items              ClaimItem[]
@@ -234,4 +238,17 @@ model VerificationToken {
 
   @@index([email])
   @@index([token])
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([code])
+  @@index([isActive])
 }

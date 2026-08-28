@@ -39,9 +39,32 @@ describe('ClaimsService (TDD)', () => {
     prismaMock = {
       userPolicyQuota: {
         findUnique: vi.fn().mockResolvedValue(mockQuota),
+        findMany: vi.fn().mockResolvedValue([{ fiscalYear: 2026 }]),
       },
       claim: {
-        create: vi.fn(),
+        create: vi.fn().mockImplementation(({ data }: any) => ({
+          id: 'claim-123',
+          claimNumber: 'CLM-2026-ABCDEF',
+          userId: 'user-123',
+          fiscalYear: 2026,
+          category: ClaimCategory.CONSULTATION,
+          hospitalName: 'Singapore General Hospital',
+          hospitalGrade: 'GRADE_3A',
+          invoiceDate: new Date('2026-08-28'),
+          totalAmount: 500,
+          deductibleCovered: 100,
+          coPayRate: 0.8,
+          approvedAmount: 320,
+          outOfPocketAmount: 180,
+          status: data?.status || ClaimStatus.AUTO_VALIDATED,
+          notes: null,
+          items: [],
+          ruleEvaluations: [],
+          attachments: [],
+          user: mockUser,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
         findMany: vi.fn(),
         findUnique: vi.fn(),
       },
@@ -94,11 +117,34 @@ describe('ClaimsService (TDD)', () => {
       log: vi.fn().mockResolvedValue({}),
     };
 
+    const storageServiceMock: any = {
+      deleteStoredFile: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const stateMachineMock: any = {
+      transition: vi.fn().mockImplementation((claim, targetStatus, actor, reason) => ({
+        ...claim,
+        status: targetStatus,
+        statusReason: reason || null,
+        reviewedBy: actor.id,
+        reviewedAt: new Date(),
+        items: [],
+        ruleEvaluations: [],
+        attachments: [],
+        user: mockUser,
+        invoiceDate: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    };
+
     service = new ClaimsService(
       prismaMock,
       ruleEngineMock,
       actuarialServiceMock,
       auditServiceMock,
+      storageServiceMock,
+      stateMachineMock,
     );
   });
 
@@ -260,6 +306,111 @@ describe('ClaimsService (TDD)', () => {
       });
 
       expect(result.status).toBe(ClaimStatus.FLAGGED_REVIEW);
+    });
+
+    it('should reject claim if user has no active policy quota for fiscal year', async () => {
+      prismaMock.userPolicyQuota.findUnique = vi.fn().mockResolvedValue(null);
+      prismaMock.userPolicyQuota.findMany = vi.fn().mockResolvedValue([]);
+
+      await expect(
+        service.submitClaim('unassigned-user', {
+          category: ClaimCategory.CONSULTATION,
+          invoiceDate: '2026-08-28',
+          hospitalName: 'Singapore General Hospital',
+          items: [
+            {
+              description: 'Consultation',
+              category: ClaimCategory.CONSULTATION,
+              unitPrice: 150,
+              quantity: 1,
+              totalPrice: 150,
+              isEligible: true,
+            },
+          ],
+        }),
+      ).rejects.toThrow('No active medical policy quota found on your account');
+    });
+
+    it('should reject claim if invoice date is outside the active policy fiscal year', async () => {
+      prismaMock.userPolicyQuota.findUnique = vi.fn().mockResolvedValue(null);
+      prismaMock.userPolicyQuota.findMany = vi.fn().mockResolvedValue([{ fiscalYear: 2026 }]);
+
+      await expect(
+        service.submitClaim('user-123', {
+          category: ClaimCategory.CONSULTATION,
+          invoiceDate: '2024-05-10',
+          hospitalName: 'Singapore General Hospital',
+          items: [
+            {
+              description: 'Past Year Consultation',
+              category: ClaimCategory.CONSULTATION,
+              unitPrice: 150,
+              quantity: 1,
+              totalPrice: 150,
+              isEligible: true,
+            },
+          ],
+        }),
+      ).rejects.toThrow('outside your active policy coverage years (2026)');
+    });
+
+    it('should correctly link and reload attachments when attachmentIds are provided', async () => {
+      prismaMock.receiptAttachment = {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      };
+      prismaMock.claim.findUnique = vi.fn().mockResolvedValue({
+        id: 'claim-123',
+        claimNumber: 'CLM-2026-ABCDEF',
+        userId: 'user-123',
+        fiscalYear: 2026,
+        category: ClaimCategory.CONSULTATION,
+        hospitalName: 'Singapore General Hospital',
+        hospitalGrade: 'GRADE_3A',
+        invoiceDate: new Date('2026-08-28'),
+        totalAmount: 500,
+        deductibleCovered: 100,
+        coPayRate: 0.8,
+        approvedAmount: 320,
+        outOfPocketAmount: 180,
+        status: ClaimStatus.AUTO_VALIDATED,
+        notes: null,
+        items: [],
+        ruleEvaluations: [],
+        attachments: [
+          {
+            id: 'att-1',
+            fileName: 'receipt.png',
+            fileSize: 1024,
+            mimeType: 'image/png',
+            storageKey: 'key.enc',
+            checksum: 'abc',
+            createdAt: new Date(),
+          },
+        ],
+        user: mockUser,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await service.submitClaim('user-123', {
+        category: ClaimCategory.CONSULTATION,
+        invoiceDate: '2026-08-28',
+        hospitalName: 'Singapore General Hospital',
+        items: [
+          {
+            description: 'Specialist Consultation',
+            category: ClaimCategory.CONSULTATION,
+            unitPrice: 500,
+            quantity: 1,
+            totalPrice: 500,
+            isEligible: true,
+          },
+        ],
+        attachmentIds: ['att-1'],
+      });
+
+      expect(result.attachments).toHaveLength(1);
+      expect(result.attachments[0].id).toBe('att-1');
     });
   });
 });

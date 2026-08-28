@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { UserRole } from '@healthclaim/shared';
+import { UserRole, DepartmentResponseDto } from '@healthclaim/shared';
+import { apiClient } from '../api/client';
 import { BRAND_CONFIG } from '../config/branding';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
@@ -33,11 +34,28 @@ export const LoginPage: React.FC = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [department, setDepartment] = useState('');
+  const [departments, setDepartments] = useState<DepartmentResponseDto[]>([]);
   const [role, setRole] = useState<UserRole>(UserRole.EMPLOYEE);
   const [loading, setLoading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Load active corporate departments for registration
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const data = await apiClient.get<any, DepartmentResponseDto[]>('/departments');
+        setDepartments(data);
+        if (data.length > 0 && !department) {
+          setDepartment(data[0].name);
+        }
+      } catch (err) {
+        console.error('Failed to load departments', err);
+      }
+    };
+    fetchDepartments();
+  }, []);
 
   // GSAP Smooth Entrance
   useEffect(() => {
@@ -86,19 +104,13 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50/70 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8 selection:bg-[#0a2540] selection:text-white">
       <div ref={containerRef} className="sm:mx-auto sm:w-full sm:max-w-[420px]">
-        {/* Logo & Project Title */}
-        <div className="flex flex-col items-center justify-center mb-6 text-center gsap-reveal">
+        {/* Pure Logo (No Text, Enlarged Prominence) */}
+        <div className="flex flex-col items-center justify-center mb-8 text-center gsap-reveal">
           <img
             src={BRAND_CONFIG.logoUrl}
             alt={BRAND_CONFIG.fullName}
-            className="h-16 w-16 object-contain mb-3 hover:scale-105 transition-transform duration-300"
+            className="w-48 h-48 sm:w-52 sm:h-52 object-contain hover:scale-105 transition-transform duration-300 drop-shadow-xs"
           />
-          <h1 className="text-2xl font-bold tracking-tight text-[#0a2540]">
-            {BRAND_CONFIG.name} <span className="text-[#00a88f]">{BRAND_CONFIG.suffix}</span>
-          </h1>
-          <p className="text-xs text-slate-500 font-medium mt-1">
-            Enterprise Medical Insurance & Settlement Platform
-          </p>
         </div>
 
         {/* Auth Card */}
@@ -166,18 +178,27 @@ export const LoginPage: React.FC = () => {
 
                 <div className="gsap-reveal">
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Department
+                    Corporate Department
                   </label>
-                  <div className="relative">
-                    <Building2 className="h-4 w-4 absolute left-3 top-2.5 text-slate-400" />
-                    <Input
-                      type="text"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      placeholder="e.g. Engineering, Treasury, HR"
-                      className="pl-9"
-                    />
-                  </div>
+                  <Select
+                    value={department}
+                    onValueChange={setDepartment}
+                  >
+                    <SelectTrigger>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                        <SelectValue placeholder="Select corporate department" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.name}>
+                          <span>{dept.name}</span>
+                          <span className="ml-2 text-[10px] text-slate-400 font-mono">({dept.code})</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="gsap-reveal">

@@ -9,6 +9,32 @@ async function main() {
   const currentYear = new Date().getFullYear();
   const defaultPassword = await bcrypt.hash('Password123!', 10);
 
+  // 0. Create Standard Corporate Departments
+  console.log('Creating standard corporate departments...');
+  const departments = [
+    { code: 'ENG', name: 'Engineering & IT', description: 'Software engineering, DevOps, and cloud infrastructure' },
+    { code: 'PROD', name: 'Product & Design', description: 'Product management, UX/UI, and user research' },
+    { code: 'FIN', name: 'Finance & Treasury', description: 'Corporate treasury, accounting, and financial planning' },
+    { code: 'HR', name: 'Human Resources', description: 'People operations, talent acquisition, and employee benefits' },
+    { code: 'OPS', name: 'Operations & Logistics', description: 'Business operations and supply chain management' },
+    { code: 'SALES', name: 'Sales & Marketing', description: 'Enterprise sales, brand strategy, and customer growth' },
+    { code: 'LEGAL', name: 'Legal & Compliance', description: 'Corporate governance, contracts, and regulatory affairs' },
+    { code: 'EXEC', name: 'Executive Management', description: 'C-Suite leadership and strategic operations' },
+  ];
+
+  for (const dept of departments) {
+    await prisma.department.upsert({
+      where: { code: dept.code },
+      update: { name: dept.name, description: dept.description },
+      create: {
+        code: dept.code,
+        name: dept.name,
+        description: dept.description,
+        isActive: true,
+      },
+    });
+  }
+
   // 1. Create Benefit Tiers
   console.log('Creating corporate benefit tiers...');
   const standardTier = await prisma.benefitTier.upsert({

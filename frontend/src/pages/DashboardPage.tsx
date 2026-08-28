@@ -27,6 +27,9 @@ import {
   Building2,
   ChevronRight,
   Eye,
+  Archive,
+  Check,
+  X,
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
@@ -103,17 +106,33 @@ export const DashboardPage: React.FC = () => {
           </span>
         );
       case ClaimStatus.OFFICER_APPROVED:
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+            <Check className="h-3 w-3" /> Officer Approved
+          </span>
+        );
       case ClaimStatus.FINANCE_APPROVED:
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md">
+            <Check className="h-3 w-3" /> Finance Approved
+          </span>
+        );
       case ClaimStatus.SETTLED:
         return (
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#00a88f] bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md">
-            <ShieldCheck className="h-3 w-3" /> {status}
+            <ShieldCheck className="h-3 w-3" /> Settled
           </span>
         );
       case ClaimStatus.OFFICER_REJECTED:
         return (
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-            <AlertCircle className="h-3 w-3" /> Rejected
+            <X className="h-3 w-3" /> Rejected
+          </span>
+        );
+      case ClaimStatus.CANCELLED:
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+            <Archive className="h-3 w-3" /> Withdrawn / Void
           </span>
         );
       case ClaimStatus.SUBMITTED:

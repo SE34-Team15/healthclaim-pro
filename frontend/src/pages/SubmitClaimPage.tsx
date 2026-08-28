@@ -50,7 +50,17 @@ import {
   Eye,
   Lock,
   Loader2,
+  FileCheck,
 } from 'lucide-react';
+
+interface LocalAttachment {
+  id: string;
+  file: File;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  localBlobUrl: string;
+}
 
 export const SubmitClaimPage: React.FC = () => {
   const { user, refreshProfile } = useAuth();
@@ -76,19 +86,16 @@ export const SubmitClaimPage: React.FC = () => {
     },
   ]);
 
-  // Uploaded receipt attachments
-  const [attachments, setAttachments] = useState<ReceiptAttachmentDto[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [previewingAttachment, setPreviewingAttachment] = useState<{
-    id: string;
-    fileName: string;
-    mimeType: string;
-    blobUrl?: string;
-  } | null>(null);
+  // Local staged attachments (purely in-memory until final submit)
+  const [localAttachments, setLocalAttachments] = useState<LocalAttachment[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewingAttachment, setPreviewingAttachment] = useState<LocalAttachment | null>(null);
 
   const [preview, setPreview] = useState<ActuarialCalculationPreviewDto | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingStep, setSubmittingStep] = useState<string | null>(null);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -98,6 +105,11 @@ export const SubmitClaimPage: React.FC = () => {
         { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out' },
       );
     }
+
+    return () => {
+      // Clean up any remaining blob URLs
+      localAttachments.forEach((a) => URL.revokeObjectURL(a.localBlobUrl));
+    };
   }, []);
 
   // Fetch real-time actuarial quote preview
@@ -105,11 +117,13 @@ export const SubmitClaimPage: React.FC = () => {
     const validItems = currentItems.filter((it) => it.description.trim() && Number(it.unitPrice) > 0);
     if (validItems.length === 0 || !hospitalName.trim()) {
       setPreview(null);
+      setPreviewError(null);
       return;
     }
 
     setLoadingPreview(true);
     try {
+      setPreviewError(null);
       const data = await apiClient.post<any, ActuarialCalculationPreviewDto>('/claims/preview', {
         category: currentCategory,
         hospitalName: hospitalName.trim(),
@@ -123,8 +137,9 @@ export const SubmitClaimPage: React.FC = () => {
         })),
       });
       setPreview(data);
-    } catch (err) {
-      // preview error handled silently
+    } catch (err: any) {
+      setPreview(null);
+      setPreviewError(err.message || 'Coverage evaluation notice');
     } finally {
       setLoadingPreview(false);
     }
@@ -178,87 +193,80 @@ export const SubmitClaimPage: React.FC = () => {
     setItems(updated);
   };
 
-  // Handle Receipt Upload
-  const handleFilesSelected = async (files: FileList | null) => {
+  // Staging local files into browser memory
+  const handleAddLocalFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    setUploading(true);
-    const token = localStorage.getItem('healthclaim_token');
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+    const newItems: LocalAttachment[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`File '${file.name}' exceeds maximum 10MB limit.`);
+      if (!allowed.includes(file.type)) {
+        toast.error(`'${file.name}' is unsupported. Please select PNG, JPG, WEBP, or PDF.`);
         continue;
       }
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      try {
-        const response = await fetch('/api/v1/attachments/upload', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.message || 'Upload failed');
-        }
-
-        const data: ReceiptAttachmentDto = await response.json();
-        setAttachments((prev) => [...prev, data]);
-        toast.success(`'${file.name}' securely encrypted (AES-256) and attached.`);
-      } catch (err: any) {
-        toast.error(err.message || `Failed to upload '${file.name}'`);
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`'${file.name}' exceeds the 10MB maximum limit.`);
+        continue;
       }
+      const localBlobUrl = URL.createObjectURL(file);
+      newItems.push({
+        id: Math.random().toString(36).substring(2, 9),
+        file,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+        localBlobUrl,
+      });
     }
 
-    setUploading(false);
+    if (newItems.length > 0) {
+      setLocalAttachments((prev) => [...prev, ...newItems]);
+      toast.success(`Attached ${newItems.length} receipt document(s).`);
+    }
+
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleDeleteAttachment = async (id: string, fileName: string) => {
-    try {
-      await apiClient.delete(`/attachments/${id}`);
-      setAttachments((prev) => prev.filter((a) => a.id !== id));
-      toast.success(`Removed attachment '${fileName}'.`);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to remove attachment');
+  const handleRemoveLocalAttachment = (id: string) => {
+    setLocalAttachments((prev) => {
+      const target = prev.find((a) => a.id === id);
+      if (target) URL.revokeObjectURL(target.localBlobUrl);
+      return prev.filter((a) => a.id !== id);
+    });
+  };
+
+  // Drag and Drop Event Handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files) {
+      handleAddLocalFiles(e.dataTransfer.files);
     }
   };
 
-  const handleOpenAttachmentPreview = async (attachment: ReceiptAttachmentDto) => {
-    const token = localStorage.getItem('healthclaim_token');
-    try {
-      const res = await fetch(`/api/v1/attachments/${attachment.id}/preview`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to decrypt attachment preview');
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      setPreviewingAttachment({
-        id: attachment.id,
-        fileName: attachment.fileName,
-        mimeType: attachment.mimeType,
-        blobUrl,
-      });
-    } catch (err: any) {
-      toast.error(err.message || 'Could not decrypt preview');
-    }
-  };
-
-  const handleClosePreview = () => {
-    if (previewingAttachment?.blobUrl) {
-      URL.revokeObjectURL(previewingAttachment.blobUrl);
-    }
-    setPreviewingAttachment(null);
-  };
-
+  // Atomic Submission Pipeline
   const handleSubmitClaim = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hospitalName.trim()) {
@@ -274,7 +282,36 @@ export const SubmitClaimPage: React.FC = () => {
     }
 
     setSubmitting(true);
+    const token = localStorage.getItem('healthclaim_token');
+
     try {
+      const uploadedAttachmentIds: string[] = [];
+
+      // Step 1: Upload and encrypt all staged files upon actual submission
+      if (localAttachments.length > 0) {
+        setSubmittingStep(`Encrypting & uploading ${localAttachments.length} receipt(s)...`);
+
+        for (const att of localAttachments) {
+          const formData = new FormData();
+          formData.append('file', att.file);
+
+          const uploadedData = await apiClient.post<any, ReceiptAttachmentDto>(
+            '/attachments/upload',
+            formData,
+            {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            },
+          );
+
+          if (uploadedData?.id) {
+            uploadedAttachmentIds.push(uploadedData.id);
+          }
+        }
+      }
+
+      // Step 2: Create and evaluate claim with atomic attachment binding
+      setSubmittingStep('Auditing AST compliance rules & saving claim...');
+
       const formattedItems = items.map((it) => ({
         ...it,
         unitPrice: Number(it.unitPrice),
@@ -289,16 +326,18 @@ export const SubmitClaimPage: React.FC = () => {
         invoiceDate: invoiceDate.toISOString().split('T')[0],
         notes: notes || undefined,
         items: formattedItems,
-        attachmentIds: attachments.map((a) => a.id),
+        attachmentIds: uploadedAttachmentIds,
       });
 
       toast.success(`Claim ${response.claimNumber} submitted successfully!`);
+      localAttachments.forEach((a) => URL.revokeObjectURL(a.localBlobUrl));
       await refreshProfile();
       navigate('/claims/my-claims');
     } catch (err: any) {
       toast.error(err.message || 'Claim submission failed');
     } finally {
       setSubmitting(false);
+      setSubmittingStep(null);
     }
   };
 
@@ -540,15 +579,15 @@ export const SubmitClaimPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Medical Receipts & Invoices Attachment Upload Card */}
+          {/* Medical Receipts & Invoices Attachment Dropzone */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-4 anim-card">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                  <Lock className="h-4 w-4 text-indigo-600" /> Proof of Payment & Receipts (Encrypted)
+                  <Lock className="h-4 w-4 text-indigo-600" /> Proof of Payment & Receipts
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Upload clinic receipts, hospital bills, or prescription receipts. Files are encrypted with AES-256-GCM.
+                  Attach hospital bills, clinic receipts, or prescriptions. All documents are end-to-end encrypted upon submission.
                 </p>
               </div>
 
@@ -557,7 +596,7 @@ export const SubmitClaimPage: React.FC = () => {
                 ref={fileInputRef}
                 multiple
                 accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
-                onChange={(e) => handleFilesSelected(e.target.files)}
+                onChange={(e) => handleAddLocalFiles(e.target.files)}
                 className="hidden"
               />
 
@@ -566,41 +605,45 @@ export const SubmitClaimPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
                 className="gap-1.5 h-8 text-xs font-semibold text-indigo-600 border-indigo-200 hover:bg-indigo-50"
               >
-                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />}
-                <span>{uploading ? 'Encrypting...' : 'Upload File'}</span>
+                <UploadCloud className="h-3.5 w-3.5" />
+                <span>Browse Files</span>
               </Button>
             </div>
 
-            {/* Drag & Drop Visual Area */}
+            {/* Drag & Drop Visual Area with Real-time Feedback */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                handleFilesSelected(e.dataTransfer.files);
-              }}
-              className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/20 rounded-xl p-5 text-center cursor-pointer transition-colors"
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 select-none ${
+                isDragging
+                  ? 'border-indigo-600 bg-indigo-50/80 ring-4 ring-indigo-500/10 scale-[1.01]'
+                  : 'border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/20'
+              }`}
             >
-              <div className="flex flex-col items-center justify-center gap-1.5">
-                <UploadCloud className="h-7 w-7 text-indigo-500" />
-                <p className="text-xs font-semibold text-slate-700">
-                  Click or drag hospital receipts here
+              <div className="flex flex-col items-center justify-center gap-1.5 pointer-events-none">
+                <UploadCloud className={`h-8 w-8 transition-transform ${isDragging ? 'text-indigo-600 scale-110 animate-bounce' : 'text-indigo-500'}`} />
+                <p className="text-xs font-bold text-slate-800">
+                  {isDragging ? 'Release mouse to attach files now' : 'Click or drag medical invoices & receipts here'}
                 </p>
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[10px] text-slate-400 font-medium">
                   Supports PNG, JPG, WEBP, PDF up to 10MB per file
                 </p>
               </div>
             </div>
 
-            {/* List of Uploaded & Encrypted Attachments */}
-            {attachments.length > 0 && (
+            {/* List of Staged Local Attachments */}
+            {localAttachments.length > 0 && (
               <div className="space-y-2 pt-2">
-                <p className="text-[11px] font-bold text-slate-600">Attached Documents ({attachments.length}):</p>
+                <p className="text-[11px] font-bold text-slate-700">
+                  Ready to Submit ({localAttachments.length} file{localAttachments.length > 1 ? 's' : ''}):
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {attachments.map((att) => (
+                  {localAttachments.map((att) => (
                     <div
                       key={att.id}
                       className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2"
@@ -617,8 +660,8 @@ export const SubmitClaimPage: React.FC = () => {
                           </p>
                           <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
                             <span>{(att.fileSize / 1024).toFixed(0)} KB</span>
-                            <span className="text-emerald-600 flex items-center gap-0.5">
-                              <ShieldCheck className="h-3 w-3" /> AES-256
+                            <span className="text-indigo-600 flex items-center gap-0.5">
+                              <FileCheck className="h-3 w-3" /> Staged
                             </span>
                           </div>
                         </div>
@@ -629,9 +672,9 @@ export const SubmitClaimPage: React.FC = () => {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleOpenAttachmentPreview(att)}
+                          onClick={() => setPreviewingAttachment(att)}
                           className="h-7 w-7 p-0 text-slate-500 hover:text-indigo-600"
-                          title="Preview decrypted receipt"
+                          title="Instant local preview"
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
@@ -639,9 +682,9 @@ export const SubmitClaimPage: React.FC = () => {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteAttachment(att.id, att.fileName)}
+                          onClick={() => handleRemoveLocalAttachment(att.id)}
                           className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600"
-                          title="Remove attachment"
+                          title="Remove file"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -715,6 +758,16 @@ export const SubmitClaimPage: React.FC = () => {
                   </div>
                 </div>
               </div>
+            ) : previewError ? (
+              <div className="p-4 rounded-xl border border-amber-200/90 bg-amber-50/80 text-amber-950 text-xs space-y-2">
+                <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>Coverage & Policy Notice</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-amber-800 font-medium">
+                  {previewError}
+                </p>
+              </div>
             ) : (
               <div className="p-6 rounded-xl border border-dashed border-slate-200 text-center text-slate-400 text-xs">
                 Enter hospital provider and invoice items to preview live settlement calculation.
@@ -723,37 +776,46 @@ export const SubmitClaimPage: React.FC = () => {
 
             <Button
               type="submit"
-              disabled={submitting || totalClaimAmount <= 0}
+              disabled={submitting || totalClaimAmount <= 0 || !!previewError}
               className="w-full gap-2 font-semibold h-10 shadow-sm"
             >
-              <Send className="h-4 w-4" />
-              <span>{submitting ? 'Auditing & Submitting...' : 'Submit Claim'}</span>
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="truncate">{submittingStep || 'Submitting...'}</span>
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  <span>Submit Claim</span>
+                </>
+              )}
             </Button>
           </div>
         </div>
       </form>
 
-      {/* Decrypted Receipt Preview Modal */}
-      <Dialog open={!!previewingAttachment} onOpenChange={(open) => !open && handleClosePreview()}>
+      {/* Local Instant Preview Modal */}
+      <Dialog open={!!previewingAttachment} onOpenChange={(open) => !open && setPreviewingAttachment(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader className="pr-6">
             <DialogTitle className="flex items-center gap-2 text-sm font-bold text-slate-900">
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              Decrypted Receipt: {previewingAttachment?.fileName}
+              <ShieldCheck className="h-4 w-4 text-indigo-600" />
+              Receipt Preview: {previewingAttachment?.fileName}
             </DialogTitle>
           </DialogHeader>
 
-          {previewingAttachment?.blobUrl && (
+          {previewingAttachment && (
             <div className="p-2 rounded-xl bg-slate-900/5 flex items-center justify-center max-h-[70vh] overflow-auto">
               {previewingAttachment.mimeType.includes('pdf') ? (
                 <iframe
-                  src={previewingAttachment.blobUrl}
+                  src={previewingAttachment.localBlobUrl}
                   title={previewingAttachment.fileName}
                   className="w-full h-[65vh] rounded-lg border-0"
                 />
               ) : (
                 <img
-                  src={previewingAttachment.blobUrl}
+                  src={previewingAttachment.localBlobUrl}
                   alt={previewingAttachment.fileName}
                   className="max-w-full max-h-[65vh] rounded-lg object-contain shadow-md"
                 />

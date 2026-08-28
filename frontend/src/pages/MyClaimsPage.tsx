@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { ClaimResponseDto, ClaimStatus, ReceiptAttachmentDto } from '@healthclaim/shared';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -24,12 +25,20 @@ import {
   Eye,
   Download,
   Lock,
+  Archive,
+  Check,
+  X,
+  FileX2,
 } from 'lucide-react';
 
 export const MyClaimsPage: React.FC = () => {
   const [claims, setClaims] = useState<ClaimResponseDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClaim, setSelectedClaim] = useState<ClaimResponseDto | null>(null);
+  const [cancellingClaim, setCancellingClaim] = useState<ClaimResponseDto | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+
   const [previewingAttachment, setPreviewingAttachment] = useState<{
     id: string;
     fileName: string;
@@ -43,6 +52,10 @@ export const MyClaimsPage: React.FC = () => {
     try {
       const data = await apiClient.get<any, ClaimResponseDto[]>('/claims/my-claims');
       setClaims(data);
+      if (selectedClaim) {
+        const updated = data.find((c) => c.id === selectedClaim.id);
+        if (updated) setSelectedClaim(updated);
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to fetch personal claims');
     } finally {
@@ -59,6 +72,29 @@ export const MyClaimsPage: React.FC = () => {
       animatePageEntrance(containerRef.current);
     }
   }, [loading]);
+
+  const handleWithdrawClaim = async () => {
+    if (!cancellingClaim) return;
+    setCancelling(true);
+    try {
+      const updated = await apiClient.post<any, ClaimResponseDto>(
+        `/claims/${cancellingClaim.id}/transition`,
+        {
+          targetStatus: ClaimStatus.CANCELLED,
+          reason: cancelReason.trim() || 'Withdrawn by employee',
+        },
+      );
+      toast.success('Claim application successfully withdrawn.');
+      setSelectedClaim(updated);
+      setCancellingClaim(null);
+      setCancelReason('');
+      await fetchClaims();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to withdraw claim');
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const handleOpenAttachmentPreview = async (attachment: ReceiptAttachmentDto) => {
     const token = localStorage.getItem('healthclaim_token');
@@ -124,17 +160,33 @@ export const MyClaimsPage: React.FC = () => {
           </span>
         );
       case ClaimStatus.OFFICER_APPROVED:
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+            <Check className="h-3 w-3" /> Officer Approved
+          </span>
+        );
       case ClaimStatus.FINANCE_APPROVED:
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-md">
+            <Check className="h-3 w-3" /> Finance Approved
+          </span>
+        );
       case ClaimStatus.SETTLED:
         return (
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#00a88f] bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-md">
-            <ShieldCheck className="h-3 w-3" /> {status}
+            <ShieldCheck className="h-3 w-3" /> Settled & Paid
           </span>
         );
       case ClaimStatus.OFFICER_REJECTED:
         return (
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-            <AlertCircle className="h-3 w-3" /> Rejected
+            <X className="h-3 w-3" /> Rejected
+          </span>
+        );
+      case ClaimStatus.CANCELLED:
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+            <Archive className="h-3 w-3" /> Withdrawn / Void
           </span>
         );
       case ClaimStatus.SUBMITTED:
@@ -146,6 +198,76 @@ export const MyClaimsPage: React.FC = () => {
         );
     }
   };
+
+  const renderProgressSteps = (status: ClaimStatus) => {
+    const isRejected = status === ClaimStatus.OFFICER_REJECTED;
+    const isCancelled = status === ClaimStatus.CANCELLED;
+
+    if (isRejected || isCancelled) {
+      return (
+        <div className={`p-3 rounded-xl border flex items-center gap-2.5 text-xs font-semibold ${
+          isRejected ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-slate-100 border-slate-200 text-slate-700'
+        }`}>
+          {isRejected ? <FileX2 className="h-4 w-4 text-rose-600 shrink-0" /> : <Archive className="h-4 w-4 text-slate-500 shrink-0" />}
+          <div>
+            <span>{isRejected ? 'Claim Rejected by Review Officer' : 'Claim Withdrawn / Cancelled'}</span>
+            {selectedClaim?.statusReason && (
+              <p className="text-[11px] font-normal text-slate-600 mt-0.5">
+                Remarks: {selectedClaim.statusReason}
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const steps = [
+      { id: 'submitted', label: '1. Submitted', active: true },
+      {
+        id: 'officer',
+        label: '2. Officer Review',
+        active: [
+          ClaimStatus.OFFICER_APPROVED,
+          ClaimStatus.FINANCE_APPROVED,
+          ClaimStatus.SETTLED,
+        ].includes(status),
+      },
+      {
+        id: 'finance',
+        label: '3. Finance Check',
+        active: [ClaimStatus.FINANCE_APPROVED, ClaimStatus.SETTLED].includes(status),
+      },
+      {
+        id: 'settled',
+        label: '4. Disbursed',
+        active: status === ClaimStatus.SETTLED,
+      },
+    ];
+
+    return (
+      <div className="grid grid-cols-4 gap-1 p-2 bg-slate-50 rounded-xl border border-slate-200/80 text-center text-[10px] font-semibold">
+        {steps.map((step, idx) => (
+          <div
+            key={idx}
+            className={`py-1.5 px-1 rounded-lg flex items-center justify-center gap-1 transition-colors ${
+              step.active
+                ? 'bg-white text-[#0a2540] shadow-2xs font-bold border border-slate-200/60'
+                : 'text-slate-400'
+            }`}
+          >
+            {step.active && <Check className="h-3 w-3 text-emerald-600" />}
+            <span className="truncate">{step.label}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const isWithdrawable =
+    selectedClaim &&
+    [ClaimStatus.SUBMITTED, ClaimStatus.AUTO_VALIDATED, ClaimStatus.FLAGGED_REVIEW].includes(
+      selectedClaim.status,
+    );
 
   return (
     <div ref={containerRef} className="space-y-6 text-slate-900 max-w-6xl mx-auto">
@@ -232,24 +354,31 @@ export const MyClaimsPage: React.FC = () => {
 
       {/* Claim Detail Modal */}
       <Dialog open={!!selectedClaim} onOpenChange={(open) => !open && setSelectedClaim(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pr-6">
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-[#0a2540]">
-              <Receipt className="h-5 w-5 text-indigo-600" />
-              Claim Voucher: {selectedClaim?.claimNumber}
-            </DialogTitle>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-[#0a2540]">
+                <Receipt className="h-5 w-5 text-indigo-600" />
+                Claim Voucher: {selectedClaim?.claimNumber}
+              </DialogTitle>
+              {selectedClaim && getStatusBadge(selectedClaim.status)}
+            </div>
           </DialogHeader>
 
           {selectedClaim && (
             <div className="space-y-4 text-xs mt-2">
+              {/* Lifecycle Progress Bar */}
+              {renderProgressSteps(selectedClaim.status)}
+
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200/60">
                 <div>
-                  <span className="text-slate-400 font-medium">Status:</span>
-                  <div className="mt-1">{getStatusBadge(selectedClaim.status)}</div>
+                  <span className="text-slate-400 font-medium">Category:</span>
+                  <p className="font-semibold text-slate-900 mt-0.5 font-mono">{selectedClaim.category}</p>
                 </div>
                 <div>
-                  <span className="text-slate-400 font-medium">Provider:</span>
+                  <span className="text-slate-400 font-medium">Provider & Grade:</span>
                   <p className="font-semibold text-slate-900 mt-0.5">{selectedClaim.hospitalName}</p>
+                  <span className="text-[10px] text-indigo-600 font-mono font-bold">{selectedClaim.hospitalGrade}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 font-medium">Visit Date:</span>
@@ -259,11 +388,39 @@ export const MyClaimsPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Withdraw Application Action (if still pre-review) */}
+              {isWithdrawable && (
+                <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200/80 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-amber-900">Need to cancel or edit this submission?</p>
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      You can withdraw this claim before officer review begins.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setCancellingClaim(selectedClaim);
+                      setCancelReason('');
+                    }}
+                    className="border-amber-300 text-amber-900 hover:bg-amber-100 h-8 text-xs font-semibold shrink-0"
+                  >
+                    Withdraw Claim
+                  </Button>
+                </div>
+              )}
+
               {/* Attached Receipts */}
               {selectedClaim.attachments && selectedClaim.attachments.length > 0 && (
                 <div>
-                  <h4 className="font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
-                    <Lock className="h-3 w-3 text-indigo-600" /> Attached Medical Receipts (AES-256 Encrypted)
+                  <h4 className="font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Lock className="h-3 w-3 text-slate-500" /> Attached Medical Receipts
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono font-normal normal-case">
+                      End-to-End Encrypted
+                    </span>
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {selectedClaim.attachments.map((att) => (
@@ -370,6 +527,57 @@ export const MyClaimsPage: React.FC = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Application Prompt Modal */}
+      <Dialog open={!!cancellingClaim} onOpenChange={(open) => !open && setCancellingClaim(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm font-bold text-slate-900">
+              <Archive className="h-4 w-4 text-amber-600" />
+              Withdraw Claim Application
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 text-xs mt-2">
+            <p className="text-slate-600 leading-relaxed">
+              Are you sure you want to withdraw claim <strong>{cancellingClaim?.claimNumber}</strong>?
+              This will void the application.
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Reason for Withdrawal (Optional)
+              </label>
+              <Input
+                type="text"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g. Attached incorrect receipt / Claimed via other channel"
+                className="h-9 text-xs"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCancellingClaim(null)}
+                className="text-xs h-8"
+              >
+                Keep Claim
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleWithdrawClaim}
+                disabled={cancelling}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs h-8"
+              >
+                {cancelling ? 'Withdrawing...' : 'Confirm Withdrawal'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

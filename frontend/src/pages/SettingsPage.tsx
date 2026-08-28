@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { apiClient } from '../api/client';
+import { DepartmentResponseDto } from '@healthclaim/shared';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import { toast } from 'sonner';
 import {
   Settings,
@@ -25,6 +33,7 @@ export const SettingsPage: React.FC = () => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
+  const [departments, setDepartments] = useState<DepartmentResponseDto[]>([]);
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Password Form State
@@ -32,6 +41,18 @@ export const SettingsPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const data = await apiClient.get<any, DepartmentResponseDto[]>('/departments');
+        setDepartments(data);
+      } catch (err) {
+        console.error('Failed to load departments', err);
+      }
+    };
+    fetchDepartments();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -188,12 +209,34 @@ export const SettingsPage: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Enterprise Department
                 </label>
-                <Input
-                  type="text"
+                <Select
                   value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="e.g. Product Engineering, Executive Office"
-                />
+                  onValueChange={setDepartment}
+                >
+                  <SelectTrigger>
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
+                      <SelectValue placeholder="Select corporate department" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Include user's current custom department if not in standard list */}
+                    {department && !departments.some((d) => d.name === department) && (
+                      <SelectItem value={department}>
+                        <span>{department}</span>
+                        <span className="ml-2 text-[10px] text-slate-400 font-mono">(Custom)</span>
+                      </SelectItem>
+                    )}
+                    {departments
+                      .filter((d) => d.isActive)
+                      .map((dept) => (
+                        <SelectItem key={dept.id} value={dept.name}>
+                          <span>{dept.name}</span>
+                          <span className="ml-2 text-[10px] text-slate-400 font-mono">({dept.code})</span>
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

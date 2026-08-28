@@ -4,4 +4,5 @@ export * from './schemas/user.schema';
 export * from './schemas/policy.schema';
 export * from './schemas/rule.schema';
 export * from './schemas/claim.schema';
+export * from './schemas/department.schema';
 export * from './types/api-response';

@@ -9,6 +9,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RuleEngineService } from '../rules/rules.service';
 import { ActuarialService } from '../actuarial/actuarial.service';
 import { AuditService } from '../audit/audit.service';
+import { StorageService } from '../storage/storage.service';
+import { ClaimStateMachine } from './state-machine/claim-state-machine';
 import {
   CreateClaimRequest,
   ClaimResponseDto,
@@ -26,7 +28,50 @@ export class ClaimsService {
     private readonly ruleEngine: RuleEngineService,
     private readonly actuarialService: ActuarialService,
     private readonly auditService: AuditService,
+    private readonly storageService: StorageService,
+    private readonly stateMachine: ClaimStateMachine,
   ) {}
+
+  /**
+   * Validates that the invoice date is within valid policy coverage and retrieves user's policy quota.
+   */
+  private async validateAndGetQuota(userId: string, invoiceDateStr: string) {
+    const invoiceDate = new Date(invoiceDateStr);
+    if (isNaN(invoiceDate.getTime())) {
+      throw new BadRequestException('Invalid invoice date format.');
+    }
+
+    const invoiceYear = invoiceDate.getFullYear();
+
+    // 1. Query the policy quota specifically for this invoice's fiscal year
+    const quota = await this.prisma.userPolicyQuota.findUnique({
+      where: { userId_fiscalYear: { userId, fiscalYear: invoiceYear } },
+      include: { benefitTier: true },
+    });
+
+    if (!quota) {
+      // Query all enrolled fiscal years for this employee to provide an accurate, helpful notice
+      const userQuotas = await this.prisma.userPolicyQuota.findMany({
+        where: { userId },
+        select: { fiscalYear: true },
+        orderBy: { fiscalYear: 'asc' },
+      });
+
+      const enrolledYears = userQuotas.map((q) => q.fiscalYear);
+
+      if (enrolledYears.length > 0) {
+        throw new BadRequestException(
+          `Invoice date (${invoiceDateStr.split('T')[0]}) falls in fiscal year ${invoiceYear}, which is outside your active policy coverage years (${enrolledYears.join(', ')}). Please select a date within your enrolled coverage periods or contact HR for prior-year exceptions.`,
+        );
+      } else {
+        throw new BadRequestException(
+          `No active medical policy quota found on your account. Please contact your HR or Benefits Administrator to enroll in a corporate medical plan.`,
+        );
+      }
+    }
+
+    return { quota, invoiceDate, invoiceYear };
+  }
 
   /**
    * Generates real-time actuarial calculation quote for a claim without persisting.
@@ -35,16 +80,7 @@ export class ClaimsService {
     userId: string,
     dto: CreateClaimRequest,
   ): Promise<ActuarialCalculationPreviewDto> {
-    const currentYear = new Date().getFullYear();
-
-    const quota = await this.prisma.userPolicyQuota.findUnique({
-      where: { userId_fiscalYear: { userId, fiscalYear: currentYear } },
-      include: { benefitTier: true },
-    });
-
-    if (!quota) {
-      throw new BadRequestException('No active medical policy quota found for the current fiscal year');
-    }
+    const { quota } = await this.validateAndGetQuota(userId, dto.invoiceDate);
 
     return this.actuarialService.calculate(
       dto.category,
@@ -72,16 +108,7 @@ export class ClaimsService {
     dto: CreateClaimRequest,
     ipAddress?: string,
   ): Promise<ClaimResponseDto> {
-    const currentYear = new Date().getFullYear();
-
-    const quota = await this.prisma.userPolicyQuota.findUnique({
-      where: { userId_fiscalYear: { userId, fiscalYear: currentYear } },
-      include: { benefitTier: true },
-    });
-
-    if (!quota) {
-      throw new BadRequestException('No active medical policy quota found for the current fiscal year');
-    }
+    const { quota, invoiceDate, invoiceYear } = await this.validateAndGetQuota(userId, dto.invoiceDate);
 
     const totalAmount = dto.items.reduce((sum, item) => sum + item.totalPrice, 0);
 
@@ -122,7 +149,7 @@ export class ClaimsService {
       ? ClaimStatus.AUTO_VALIDATED
       : ClaimStatus.FLAGGED_REVIEW;
 
-    const claimNumber = `CLM-${currentYear}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const claimNumber = `CLM-${invoiceYear}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
     // 3. Persist Claim in Database Transaction
     const claim = await this.prisma.$transaction(async (tx) => {
@@ -130,11 +157,11 @@ export class ClaimsService {
         data: {
           claimNumber,
           userId,
-          fiscalYear: currentYear,
+          fiscalYear: invoiceYear,
           category: dto.category as any,
           hospitalName: dto.hospitalName,
           hospitalGrade: dto.hospitalGrade || 'GRADE_A',
-          invoiceDate: new Date(dto.invoiceDate),
+          invoiceDate,
           totalAmount,
           deductibleCovered: calculation.deductibleApplied,
           coPayRate: calculation.applicableCoPayRate,
@@ -181,7 +208,7 @@ export class ClaimsService {
       });
 
       // Link uploaded receipt attachments to claim
-      if (dto.attachmentIds && dto.attachmentIds.length > 0 && tx.receiptAttachment) {
+      if (dto.attachmentIds && dto.attachmentIds.length > 0) {
         await tx.receiptAttachment.updateMany({
           where: {
             id: { in: dto.attachmentIds },
@@ -191,6 +218,25 @@ export class ClaimsService {
             claimId: createdClaim.id,
           },
         });
+
+        const reloaded = await tx.claim.findUnique({
+          where: { id: createdClaim.id },
+          include: {
+            items: true,
+            ruleEvaluations: true,
+            attachments: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                department: true,
+              },
+            },
+          },
+        });
+        if (reloaded) return reloaded;
       }
 
       return createdClaim;
@@ -218,11 +264,17 @@ export class ClaimsService {
   }
 
   /**
-   * Retrieves all claims submitted by the current authenticated user.
+   * Transitions a claim's status using the GoF Finite State Machine.
    */
-  async getMyClaims(userId: string): Promise<ClaimResponseDto[]> {
-    const claims = await this.prisma.claim.findMany({
-      where: { userId },
+  async transitionStatus(
+    claimId: string,
+    targetStatus: ClaimStatus,
+    actor: { id: string; role: UserRole },
+    reason?: string,
+    ipAddress?: string,
+  ): Promise<ClaimResponseDto> {
+    const claim = await this.prisma.claim.findUnique({
+      where: { id: claimId },
       include: {
         items: true,
         ruleEvaluations: true,
@@ -237,23 +289,78 @@ export class ClaimsService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
     });
 
-    return claims.map((claim) => this.mapToDto(claim));
+    if (!claim) {
+      throw new NotFoundException(`Claim with ID '${claimId}' not found.`);
+    }
+
+    const updatedClaim = await this.prisma.$transaction(async (tx) => {
+      const transitioned = await this.stateMachine.transition(
+        claim,
+        targetStatus,
+        actor,
+        reason,
+        tx,
+      );
+
+      await this.auditService.log({
+        actorId: actor.id,
+        action: 'TRANSITION_CLAIM_STATUS',
+        targetResource: 'Claim',
+        targetResourceId: claim.id,
+        details: {
+          previousStatus: claim.status,
+          targetStatus,
+          reason,
+        },
+        ipAddress,
+      });
+
+      return transitioned;
+    });
+
+    return this.mapToDto(updatedClaim);
   }
 
   /**
-   * Retrieves all enterprise claims with optional status/search filters (Claim Officers & Admins).
+   * Retrieves claims filed by the authenticated employee.
    */
-  async getAllClaims(
-    status?: ClaimStatus,
-    search?: string,
-  ): Promise<ClaimResponseDto[]> {
+  async getMyClaims(userId: string): Promise<ClaimResponseDto[]> {
+    const claims = await this.prisma.claim.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        items: true,
+        ruleEvaluations: true,
+        attachments: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            department: true,
+          },
+        },
+      },
+    });
+
+    return claims.map((c) => this.mapToDto(c));
+  }
+
+  /**
+   * Retrieves list of all claims with status/search filtering for reviewers/admins.
+   */
+  async getAllClaims(status?: string, search?: string): Promise<ClaimResponseDto[]> {
     const where: any = {};
 
-    if (status) {
-      where.status = status;
+    if (status && status !== 'ALL') {
+      if (status.includes(',')) {
+        where.status = { in: status.split(',').map((s) => s.trim()) as any };
+      } else {
+        where.status = status as any;
+      }
     }
 
     if (search) {
@@ -261,13 +368,12 @@ export class ClaimsService {
         { claimNumber: { contains: search, mode: 'insensitive' } },
         { hospitalName: { contains: search, mode: 'insensitive' } },
         { user: { email: { contains: search, mode: 'insensitive' } } },
-        { user: { firstName: { contains: search, mode: 'insensitive' } } },
-        { user: { lastName: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
     const claims = await this.prisma.claim.findMany({
       where,
+      orderBy: { createdAt: 'desc' },
       include: {
         items: true,
         ruleEvaluations: true,
@@ -282,19 +388,15 @@ export class ClaimsService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
     });
 
-    return claims.map((claim) => this.mapToDto(claim));
+    return claims.map((c) => this.mapToDto(c));
   }
 
   /**
-   * Retrieves a single claim by its unique ID.
+   * Retrieves a single claim by ID with RBAC guard.
    */
-  async getClaimById(
-    id: string,
-    user: { id: string; role: UserRole },
-  ): Promise<ClaimResponseDto> {
+  async getClaimById(id: string, user: { id: string; role: UserRole }): Promise<ClaimResponseDto> {
     const claim = await this.prisma.claim.findUnique({
       where: { id },
       include: {
@@ -314,23 +416,69 @@ export class ClaimsService {
     });
 
     if (!claim) {
-      throw new NotFoundException(`Claim with ID ${id} not found`);
+      throw new NotFoundException(`Claim with ID '${id}' not found`);
     }
 
-    // Employees can only view their own claims
     if (user.role === UserRole.EMPLOYEE && claim.userId !== user.id) {
-      throw new ForbiddenException('You do not have permission to view this claim');
+      throw new ForbiddenException('You do not have permission to view this claim voucher.');
     }
 
     return this.mapToDto(claim);
   }
 
+  /**
+   * Super Admin Only: Force purge a claim and cascade physical file deletion
+   */
+  async forcePurgeClaim(claimId: string, adminUserId: string, ipAddress?: string): Promise<{ success: boolean; message: string }> {
+    const claim = await this.prisma.claim.findUnique({
+      where: { id: claimId },
+      include: { attachments: true },
+    });
+
+    if (!claim) {
+      throw new NotFoundException(`Claim '${claimId}' not found.`);
+    }
+
+    // 1. Physically delete all encrypted files from storage
+    if (claim.attachments && claim.attachments.length > 0) {
+      for (const att of claim.attachments) {
+        await this.storageService.deleteStoredFile(att.storageKey);
+      }
+    }
+
+    // 2. Cascade delete database record
+    await this.prisma.claim.delete({
+      where: { id: claimId },
+    });
+
+    // 3. Log high-severity audit record
+    await this.auditService.log({
+      actorId: adminUserId,
+      action: 'FORCE_PURGE_CLAIM',
+      targetResource: 'Claim',
+      targetResourceId: claimId,
+      details: {
+        claimNumber: claim.claimNumber,
+        attachmentsPurged: claim.attachments.length,
+        totalAmount: Number(claim.totalAmount),
+      },
+      ipAddress,
+    });
+
+    return {
+      success: true,
+      message: `Claim ${claim.claimNumber} and all ${claim.attachments.length} encrypted receipts permanently purged.`,
+    };
+  }
+
+  /**
+   * Maps Prisma database entity to standard response DTO.
+   */
   private mapToDto(claim: any): ClaimResponseDto {
     return {
       id: claim.id,
       claimNumber: claim.claimNumber,
       userId: claim.userId,
-      user: claim.user,
       fiscalYear: claim.fiscalYear,
       category: claim.category,
       hospitalName: claim.hospitalName,
@@ -342,18 +490,21 @@ export class ClaimsService {
       approvedAmount: Number(claim.approvedAmount),
       outOfPocketAmount: Number(claim.outOfPocketAmount),
       status: claim.status,
+      statusReason: claim.statusReason,
+      reviewedBy: claim.reviewedBy,
+      reviewedAt: claim.reviewedAt ? claim.reviewedAt.toISOString() : null,
       notes: claim.notes,
-      items: claim.items.map((i: any) => ({
-        id: i.id,
-        description: i.description,
-        category: i.category,
-        unitPrice: Number(i.unitPrice),
-        quantity: i.quantity,
-        totalPrice: Number(i.totalPrice),
-        isEligible: i.isEligible,
-        rejectionReason: i.rejectionReason,
+      items: claim.items.map((it: any) => ({
+        id: it.id,
+        description: it.description,
+        category: it.category,
+        unitPrice: Number(it.unitPrice),
+        quantity: it.quantity,
+        totalPrice: Number(it.totalPrice),
+        isEligible: it.isEligible,
+        rejectionReason: it.rejectionReason,
       })),
-      ruleEvaluations: claim.ruleEvaluations?.map((r: any) => ({
+      ruleEvaluations: claim.ruleEvaluations.map((r: any) => ({
         ruleId: r.ruleId,
         ruleCode: r.ruleCode,
         ruleName: r.ruleName,
@@ -361,16 +512,18 @@ export class ClaimsService {
         reason: r.reason,
         details: r.details,
       })),
-      attachments: claim.attachments?.map((a: any) => ({
-        id: a.id,
-        claimId: a.claimId,
-        fileName: a.fileName,
-        fileSize: a.fileSize,
-        mimeType: a.mimeType,
-        checksum: a.checksum,
-        createdAt: a.createdAt.toISOString(),
-        previewUrl: `/api/v1/attachments/${a.id}/preview`,
-      })) || [],
+      attachments:
+        claim.attachments?.map((a: any) => ({
+          id: a.id,
+          claimId: a.claimId,
+          fileName: a.fileName,
+          fileSize: a.fileSize,
+          mimeType: a.mimeType,
+          checksum: a.checksum,
+          createdAt: a.createdAt.toISOString(),
+          previewUrl: `/api/v1/attachments/${a.id}/preview`,
+        })) || [],
+      user: claim.user,
       createdAt: claim.createdAt.toISOString(),
       updatedAt: claim.updatedAt.toISOString(),
     };

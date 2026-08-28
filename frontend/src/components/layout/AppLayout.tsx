@@ -111,38 +111,16 @@ export const AppLayout: React.FC = () => {
   const roleMeta = user?.role ? ROLE_METADATA[user.role] : ROLE_METADATA[UserRole.EMPLOYEE];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row text-slate-900 selection:bg-[#0a2540] selection:text-white">
+    <div className="h-screen w-full overflow-hidden bg-[#f8fafc] flex flex-col md:flex-row text-slate-900 selection:bg-[#0a2540] selection:text-white">
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200/80 z-20 shadow-xs">
-        {/* Brand Header with Clean Logo */}
-        <div className="flex items-center gap-3 px-5 h-16 border-b border-slate-100">
+      <aside className="hidden md:flex flex-col w-64 h-full shrink-0 bg-white border-r border-slate-200/80 z-20 shadow-xs">
+        {/* Brand Header with Clean Logo (Pure Logo, No Text, Scaled with Sidebar Width) */}
+        <div className="flex items-center justify-center p-3.5 border-b border-slate-100 shrink-0">
           <img
             src={BRAND_CONFIG.logoUrl}
             alt={BRAND_CONFIG.fullName}
-            className="h-8 w-8 object-contain shrink-0"
+            className="w-full max-w-[215px] h-36 object-contain hover:scale-[1.02] transition-transform duration-300"
           />
-          <div>
-            <span className="font-bold text-sm tracking-tight text-[#0a2540] flex items-center gap-1">
-              {BRAND_CONFIG.name} <span className="text-[#00a88f] font-extrabold">{BRAND_CONFIG.suffix}</span>
-            </span>
-          </div>
-        </div>
-
-        {/* User Mini Profile */}
-        <div className="p-4 border-b border-slate-100">
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-[#0a2540] text-white flex items-center justify-center text-xs font-bold shrink-0">
-              {user?.firstName?.[0] || 'U'}{user?.lastName?.[0] || ''}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-900 truncate">
-                {user?.firstName} {user?.lastName}
-              </p>
-              <span className="inline-block text-[10px] font-semibold text-[#00a88f] font-mono">
-                {roleMeta.badgeLabel}
-              </span>
-            </div>
-          </div>
         </div>
 
         {/* Navigation */}
@@ -172,7 +150,7 @@ export const AppLayout: React.FC = () => {
         </nav>
 
         {/* Sign Out */}
-        <div className="p-3 border-t border-slate-100">
+        <div className="p-3 shrink-0 border-t border-slate-100">
           <button
             onClick={logout}
             className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-950 hover:bg-slate-100 transition-colors"
@@ -184,9 +162,9 @@ export const AppLayout: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Top Header */}
-        <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-6 flex items-center justify-between sticky top-0 z-10">
+        <header className="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-6 flex items-center justify-between z-10">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -194,30 +172,46 @@ export const AppLayout: React.FC = () => {
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <span>{user?.department || 'General Enterprise'}</span>
-            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Clean Remaining Quota Indicator */}
+          <div className="flex items-center gap-3.5">
+            {/* Clean Remaining Quota Indicator (Only rendered for Employees with Quota) */}
             {user?.role === UserRole.EMPLOYEE && user.activeQuota && (
-              <div className="hidden sm:flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 rounded-xl text-xs">
-                <span className="text-slate-500 font-medium">Quota:</span>
-                <span className="font-bold text-[#0a2540]">
-                  ${user.activeQuota.remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              <>
+                <div className="hidden sm:flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 rounded-xl text-xs shadow-2xs">
+                  <span className="text-slate-500 font-medium">Quota:</span>
+                  <span className="font-bold text-[#0a2540]">
+                    ${user.activeQuota.remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-slate-400 text-[11px]">
+                    / ${user.activeQuota.annualLimit.toLocaleString()}
+                  </span>
+                </div>
+                {/* Clean divider between Quota and User Identity */}
+                <div className="hidden sm:block h-5 w-px bg-slate-200/90" />
+              </>
+            )}
+
+            {/* Aggregated User Identity (Name, Role, Department) */}
+            <div className="flex flex-col items-start text-left">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-900 leading-tight">
+                  {user?.firstName} {user?.lastName}
                 </span>
-                <span className="text-slate-400 text-[11px]">
-                  / ${user.activeQuota.annualLimit.toLocaleString()}
+                <span className="text-[10px] font-semibold text-[#00a88f] font-mono px-1.5 py-0.5 rounded-md bg-teal-50 border border-teal-200/60 leading-tight">
+                  {roleMeta.badgeLabel}
                 </span>
               </div>
-            )}
+              <span className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">
+                {user?.department || 'General Enterprise'}
+              </span>
+            </div>
           </div>
         </header>
 
         {/* Mobile Dropdown Nav */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 space-y-1">
+          <div className="md:hidden shrink-0 bg-white border-b border-slate-200 px-4 py-3 space-y-1">
             {filteredNavItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -243,7 +237,7 @@ export const AppLayout: React.FC = () => {
         )}
 
         {/* Page Main Content */}
-        <main ref={mainContentRef} className="flex-1 p-6 md:p-8 overflow-y-auto">
+        <main ref={mainContentRef} className="flex-1 p-6 md:p-8 overflow-y-auto min-h-0">
           <Outlet />
         </main>
       </div>

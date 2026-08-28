@@ -6,8 +6,9 @@ describe('StorageService (Dual-Key Envelope Encryption & Magic Byte Verification
   let service: StorageService;
   const createdKeys: string[] = [];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     service = new StorageService();
+    await service.onModuleInit();
   });
 
   afterEach(async () => {

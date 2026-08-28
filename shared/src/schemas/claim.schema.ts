@@ -20,6 +20,7 @@ export enum ClaimStatus {
   OFFICER_REJECTED = 'OFFICER_REJECTED',
   FINANCE_APPROVED = 'FINANCE_APPROVED',
   SETTLED = 'SETTLED',
+  CANCELLED = 'CANCELLED',
 }
 
 export const ClaimItemSchema = z.object({
@@ -46,6 +47,13 @@ export const CreateClaimSchema = z.object({
 });
 
 export type CreateClaimRequest = z.infer<typeof CreateClaimSchema>;
+
+export const TransitionClaimStatusSchema = z.object({
+  targetStatus: z.nativeEnum(ClaimStatus),
+  reason: z.string().optional(),
+});
+
+export type TransitionClaimStatusRequest = z.infer<typeof TransitionClaimStatusSchema>;
 
 export interface ReceiptAttachmentDto {
   id: string;
@@ -104,6 +112,9 @@ export interface ClaimResponseDto {
   approvedAmount: number;
   outOfPocketAmount: number;
   status: ClaimStatus;
+  statusReason?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
   notes?: string | null;
   items: ClaimItem[];
   ruleEvaluations?: RuleEvaluationResult[];

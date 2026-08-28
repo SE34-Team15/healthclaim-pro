@@ -2,11 +2,11 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   Query,
   UseGuards,
-  Req,
   Ip,
 } from '@nestjs/common';
 import { ClaimsService } from './claims.service';
@@ -18,6 +18,8 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
   CreateClaimSchema,
   CreateClaimRequest,
+  TransitionClaimStatusSchema,
+  TransitionClaimStatusRequest,
   UserRole,
   ClaimStatus,
 } from '@healthclaim/shared';
@@ -42,6 +44,26 @@ export class ClaimsController {
     @Ip() ipAddress: string,
   ) {
     return this.claimsService.submitClaim(userId, dto, ipAddress);
+  }
+
+  @Post(':id/transition')
+  async transitionClaimStatus(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+    @Body(new ZodValidationPipe(TransitionClaimStatusSchema)) dto: TransitionClaimStatusRequest,
+    @Ip() ipAddress: string,
+  ) {
+    return this.claimsService.transitionStatus(id, dto.targetStatus, user, dto.reason, ipAddress);
+  }
+
+  @Delete(':id/force-purge')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  async forcePurgeClaim(
+    @Param('id') id: string,
+    @CurrentUser('id') adminUserId: string,
+    @Ip() ipAddress: string,
+  ) {
+    return this.claimsService.forcePurgeClaim(id, adminUserId, ipAddress);
   }
 
   @Get('my-claims')
