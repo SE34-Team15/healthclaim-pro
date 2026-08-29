@@ -9,6 +9,7 @@ import {
   CreateBenefitTier,
   UpdateBenefitTier,
   AssignUserPolicy,
+  UserRole,
 } from '@healthclaim/shared';
 
 @Injectable()
@@ -164,6 +165,10 @@ export class PoliciesService {
     const user = await this.prisma.user.findUnique({ where: { id: dto.userId } });
     if (!user) {
       throw new NotFoundException('Employee not found');
+    }
+
+    if (user.role !== UserRole.EMPLOYEE) {
+      throw new BadRequestException('Insurance policy tiers can only be assigned to users with the EMPLOYEE role.');
     }
 
     const tier = await this.prisma.benefitTier.findUnique({ where: { id: dto.benefitTierId } });

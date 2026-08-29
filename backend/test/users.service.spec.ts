@@ -122,7 +122,8 @@ describe('UsersService (TDD)', () => {
 
       expect(result.total).toBe(1);
       expect(result.items[0].email).toBe('officer@healthclaim.pro');
-      expect(result.items[0].benefitTier).toBe('Unassigned');
+      expect(result.items[0].benefitTier).toBe('—');
+      expect(result.items[0].annualLimit).toBe(0);
     });
   });
 
@@ -303,6 +304,66 @@ describe('UsersService (TDD)', () => {
       );
       expect(mockPrismaService.auditLog.create).toHaveBeenCalled();
       expect(updated.firstName).toBe('New');
+    });
+  });
+
+  describe('adminUpdateUserProfile', () => {
+    it('should update personal info, department, and reset password with audit log', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValueOnce({
+        id: 'usr-target',
+        email: 'target@healthclaim.pro',
+        firstName: 'OldFirst',
+        lastName: 'OldLast',
+        role: UserRole.EMPLOYEE,
+        status: UserStatus.ACTIVE,
+      });
+
+      mockPrismaService.user.update.mockResolvedValue({
+        id: 'usr-target',
+        email: 'newemail@healthclaim.pro',
+        firstName: 'NewFirst',
+        lastName: 'NewLast',
+        role: UserRole.EMPLOYEE,
+        status: UserStatus.SUSPENDED,
+        department: 'Finance & Treasury',
+        isEmailVerified: true,
+        updatedAt: new Date(),
+      });
+
+      const res = await service.adminUpdateUserProfile(
+        'usr-target',
+        {
+          firstName: 'NewFirst',
+          lastName: 'NewLast',
+          email: 'newemail@healthclaim.pro',
+          department: 'Finance & Treasury',
+          status: UserStatus.SUSPENDED,
+          resetPassword: 'NewSecurePassword123!',
+        },
+        'admin-1',
+      );
+
+      expect(res.firstName).toBe('NewFirst');
+      expect(res.status).toBe(UserStatus.SUSPENDED);
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'usr-target' },
+          data: expect.objectContaining({
+            firstName: 'NewFirst',
+            lastName: 'NewLast',
+            department: 'Finance & Treasury',
+            status: UserStatus.SUSPENDED,
+          }),
+        }),
+      );
+      expect(mockPrismaService.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'ADMIN_UPDATE_USER_PROFILE',
+            targetResourceId: 'usr-target',
+          }),
+        }),
+      );
     });
   });
 });

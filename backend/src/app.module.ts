@@ -11,6 +11,7 @@ import { ActuarialModule } from './actuarial/actuarial.module';
 import { ClaimsModule } from './claims/claims.module';
 import { StorageModule } from './storage/storage.module';
 import { DepartmentsModule } from './departments/departments.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { DepartmentsModule } from './departments/departments.module';
     ClaimsModule,
     StorageModule,
     DepartmentsModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

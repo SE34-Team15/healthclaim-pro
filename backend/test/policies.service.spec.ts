@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PoliciesService } from '../src/policies/policies.service';
 import { NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { UserRole } from '@healthclaim/shared';
 
 describe('PoliciesService (TDD)', () => {
   let service: PoliciesService;
@@ -170,7 +171,11 @@ describe('PoliciesService (TDD)', () => {
 
   describe('assignTierToUser', () => {
     it('should upsert user policy quota and record audit log', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'emp-1', email: 'emp@test.com' });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'emp-1',
+        email: 'emp@test.com',
+        role: UserRole.EMPLOYEE,
+      });
       mockPrismaService.benefitTier.findUnique.mockResolvedValue({
         id: 'tier-1',
         code: 'TIER_EXECUTIVE',
@@ -210,6 +215,25 @@ describe('PoliciesService (TDD)', () => {
       expect(mockPrismaService.auditLog.create).toHaveBeenCalled();
     });
 
+    it('should throw BadRequestException if user is not an EMPLOYEE', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'admin-1',
+        email: 'admin@test.com',
+        role: UserRole.SYSTEM_ADMIN,
+      });
+
+      await expect(
+        service.assignTierToUser(
+          {
+            userId: 'admin-1',
+            benefitTierId: 'tier-1',
+            fiscalYear: 2026,
+          },
+          'admin-id',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should throw NotFoundException if employee does not exist', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null);
 
@@ -226,7 +250,10 @@ describe('PoliciesService (TDD)', () => {
     });
 
     it('should throw NotFoundException if benefit tier does not exist', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'emp-1' });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'emp-1',
+        role: UserRole.EMPLOYEE,
+      });
       mockPrismaService.benefitTier.findUnique.mockResolvedValue(null);
 
       await expect(

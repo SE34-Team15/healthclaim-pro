@@ -43,6 +43,7 @@ export const SettingsPage: React.FC = () => {
   const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
+    refreshProfile();
     const fetchDepartments = async () => {
       try {
         const data = await apiClient.get<any, DepartmentResponseDto[]>('/departments');
@@ -52,7 +53,7 @@ export const SettingsPage: React.FC = () => {
       }
     };
     fetchDepartments();
-  }, []);
+  }, [refreshProfile]);
 
   useEffect(() => {
     if (user) {
@@ -210,14 +211,13 @@ export const SettingsPage: React.FC = () => {
                   Enterprise Department
                 </label>
                 <Select
-                  value={department}
+                  value={department || undefined}
                   onValueChange={setDepartment}
                 >
                   <SelectTrigger>
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
-                      <SelectValue placeholder="Select corporate department" />
-                    </div>
+                    <SelectValue placeholder="Select corporate department">
+                      {department || undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {/* Include user's current custom department if not in standard list */}

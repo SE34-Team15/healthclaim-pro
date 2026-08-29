@@ -21,6 +21,8 @@ import {
   UpdateUserStatusSchema,
   AdminCreateUser,
   AdminCreateUserSchema,
+  AdminUpdateUserDto,
+  AdminUpdateUserSchema,
   UpdateProfileDto,
   UpdateProfileSchema,
 } from '@healthclaim/shared';
@@ -105,5 +107,18 @@ export class UsersController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     return this.usersService.adminCreateUser(dto, actor.id);
+  }
+
+  /**
+   * Comprehensive user profile and credentials update (Admin only)
+   */
+  @Patch(':id/admin-profile')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  async adminUpdateUserProfile(
+    @Param('id') targetUserId: string,
+    @Body(new ZodValidationPipe(AdminUpdateUserSchema)) dto: AdminUpdateUserDto,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.usersService.adminUpdateUserProfile(targetUserId, dto, actor.id);
   }
 }

@@ -65,3 +65,19 @@ export const AdminCreateUserSchema = z.object({
 });
 
 export type AdminCreateUser = z.infer<typeof AdminCreateUserSchema>;
+
+/**
+ * Admin Comprehensive User Profile & Credentials Update Schema
+ */
+export const AdminUpdateUserSchema = z.object({
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  department: z.string().nullable().optional(),
+  status: z.nativeEnum(UserStatus).optional(),
+  role: z.nativeEnum(UserRole).optional(),
+  resetPassword: z.string().min(8, 'Password must be at least 8 characters').optional(),
+});
+
+export type AdminUpdateUserDto = z.infer<typeof AdminUpdateUserSchema>;
+

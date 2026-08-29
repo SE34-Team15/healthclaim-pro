@@ -22,7 +22,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   await app.listen(port);
-  logger.log(`🚀 HealthClaim Pro Backend running at: http://localhost:${port}/${apiPrefix.replace(/^\//, '')}`);
+  logger.log(`HealthClaim Pro Backend running at: http://localhost:${port}/${apiPrefix.replace(/^\//, '')}`);
 }
 
 bootstrap();

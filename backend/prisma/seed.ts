@@ -1,4 +1,4 @@
-import { PrismaClient, Role, UserStatus } from '@prisma/client';
+import { PrismaClient, Role, UserStatus, ClaimCategory, ClaimStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -85,7 +85,7 @@ async function main() {
   // System Administrator
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@healthclaim.pro' },
-    update: { passwordHash: defaultPassword },
+    update: { passwordHash: defaultPassword, department: 'Engineering & IT' },
     create: {
       email: 'admin@healthclaim.pro',
       passwordHash: defaultPassword,
@@ -93,7 +93,7 @@ async function main() {
       lastName: 'Vance',
       role: Role.SYSTEM_ADMIN,
       status: UserStatus.ACTIVE,
-      department: 'IT Infrastructure & Security',
+      department: 'Engineering & IT',
       isEmailVerified: true,
     },
   });
@@ -101,7 +101,7 @@ async function main() {
   // Claim Officer
   const officerUser = await prisma.user.upsert({
     where: { email: 'officer@healthclaim.pro' },
-    update: { passwordHash: defaultPassword },
+    update: { passwordHash: defaultPassword, department: 'Operations & Logistics' },
     create: {
       email: 'officer@healthclaim.pro',
       passwordHash: defaultPassword,
@@ -109,7 +109,7 @@ async function main() {
       lastName: 'Jenkins',
       role: Role.CLAIM_OFFICER,
       status: UserStatus.ACTIVE,
-      department: 'Medical Claims Operations',
+      department: 'Operations & Logistics',
       isEmailVerified: true,
     },
   });
@@ -117,7 +117,7 @@ async function main() {
   // Finance Manager
   const financeUser = await prisma.user.upsert({
     where: { email: 'finance@healthclaim.pro' },
-    update: { passwordHash: defaultPassword },
+    update: { passwordHash: defaultPassword, department: 'Finance & Treasury' },
     create: {
       email: 'finance@healthclaim.pro',
       passwordHash: defaultPassword,
@@ -125,7 +125,7 @@ async function main() {
       lastName: 'Sterling',
       role: Role.FINANCE_MANAGER,
       status: UserStatus.ACTIVE,
-      department: 'Corporate Treasury & Finance',
+      department: 'Finance & Treasury',
       isEmailVerified: true,
     },
   });
@@ -133,7 +133,7 @@ async function main() {
   // Security Auditor
   const auditorUser = await prisma.user.upsert({
     where: { email: 'auditor@healthclaim.pro' },
-    update: { passwordHash: defaultPassword },
+    update: { passwordHash: defaultPassword, department: 'Legal & Compliance' },
     create: {
       email: 'auditor@healthclaim.pro',
       passwordHash: defaultPassword,
@@ -141,7 +141,7 @@ async function main() {
       lastName: 'Rostova',
       role: Role.SECURITY_AUDITOR,
       status: UserStatus.ACTIVE,
-      department: 'Risk Governance & Audit',
+      department: 'Legal & Compliance',
       isEmailVerified: true,
     },
   });
@@ -149,7 +149,7 @@ async function main() {
   // Standard Employee
   const employeeUser = await prisma.user.upsert({
     where: { email: 'employee@healthclaim.pro' },
-    update: { passwordHash: defaultPassword },
+    update: { passwordHash: defaultPassword, department: 'Engineering & IT' },
     create: {
       email: 'employee@healthclaim.pro',
       passwordHash: defaultPassword,
@@ -157,7 +157,7 @@ async function main() {
       lastName: 'Miller',
       role: Role.EMPLOYEE,
       status: UserStatus.ACTIVE,
-      department: 'Product Engineering',
+      department: 'Engineering & IT',
       isEmailVerified: true,
     },
   });
@@ -165,7 +165,7 @@ async function main() {
   // Executive Employee
   const execEmployee = await prisma.user.upsert({
     where: { email: 'executive@healthclaim.pro' },
-    update: { passwordHash: defaultPassword },
+    update: { passwordHash: defaultPassword, department: 'Executive Management' },
     create: {
       email: 'executive@healthclaim.pro',
       passwordHash: defaultPassword,
@@ -173,77 +173,136 @@ async function main() {
       lastName: 'Chen',
       role: Role.EMPLOYEE,
       status: UserStatus.ACTIVE,
-      department: 'Executive Office',
+      department: 'Executive Management',
       isEmailVerified: true,
     },
   });
 
-  // 3. Assign Quotas for Employees
-  console.log('Assigning initial policy quotas for current fiscal year...');
-
-  await prisma.userPolicyQuota.upsert({
-    where: {
-      userId_fiscalYear: {
-        userId: employeeUser.id,
-        fiscalYear: currentYear,
-      },
-    },
-    update: {},
+  // Departmental Staff for cross-department loss-ratio & analytics
+  const prodEmployee = await prisma.user.upsert({
+    where: { email: 'product.lead@healthclaim.pro' },
+    update: { passwordHash: defaultPassword, department: 'Product & Design' },
     create: {
-      userId: employeeUser.id,
-      benefitTierId: standardTier.id,
-      fiscalYear: currentYear,
-      annualLimit: standardTier.annualLimit,
-      remainingBalance: standardTier.annualLimit,
-      cumulativeDeductibleSpent: 0,
+      email: 'product.lead@healthclaim.pro',
+      passwordHash: defaultPassword,
+      firstName: 'Lucas',
+      lastName: 'Vance',
+      role: Role.EMPLOYEE,
+      status: UserStatus.ACTIVE,
+      department: 'Product & Design',
+      isEmailVerified: true,
     },
   });
 
-  await prisma.userPolicyQuota.upsert({
-    where: {
-      userId_fiscalYear: {
-        userId: execEmployee.id,
-        fiscalYear: currentYear,
-      },
-    },
-    update: {},
+  const salesEmployee = await prisma.user.upsert({
+    where: { email: 'sales.lead@healthclaim.pro' },
+    update: { passwordHash: defaultPassword, department: 'Sales & Marketing' },
     create: {
-      userId: execEmployee.id,
-      benefitTierId: executiveTier.id,
-      fiscalYear: currentYear,
-      annualLimit: executiveTier.annualLimit,
-      remainingBalance: executiveTier.annualLimit,
-      cumulativeDeductibleSpent: 0,
+      email: 'sales.lead@healthclaim.pro',
+      passwordHash: defaultPassword,
+      firstName: 'Chloe',
+      lastName: 'Bennett',
+      role: Role.EMPLOYEE,
+      status: UserStatus.ACTIVE,
+      department: 'Sales & Marketing',
+      isEmailVerified: true,
     },
   });
+
+  const hrEmployee = await prisma.user.upsert({
+    where: { email: 'hr.specialist@healthclaim.pro' },
+    update: { passwordHash: defaultPassword, department: 'Human Resources' },
+    create: {
+      email: 'hr.specialist@healthclaim.pro',
+      passwordHash: defaultPassword,
+      firstName: 'James',
+      lastName: 'Wilson',
+      role: Role.EMPLOYEE,
+      status: UserStatus.ACTIVE,
+      department: 'Human Resources',
+      isEmailVerified: true,
+    },
+  });
+
+  const opsEmployee = await prisma.user.upsert({
+    where: { email: 'ops.lead@healthclaim.pro' },
+    update: { passwordHash: defaultPassword, department: 'Operations & Logistics' },
+    create: {
+      email: 'ops.lead@healthclaim.pro',
+      passwordHash: defaultPassword,
+      firstName: 'Daniel',
+      lastName: 'Kim',
+      role: Role.EMPLOYEE,
+      status: UserStatus.ACTIVE,
+      department: 'Operations & Logistics',
+      isEmailVerified: true,
+    },
+  });
+
+  // 3. Assign Quotas for Employees (Strictly EMPLOYEE role only)
+  console.log('Assigning initial policy quotas for current fiscal year (Employees Only)...');
+
+  // Purge any quota records for non-employee roles
+  await prisma.userPolicyQuota.deleteMany({
+    where: {
+      user: {
+        role: {
+          not: Role.EMPLOYEE,
+        },
+      },
+    },
+  });
+
+  const employeeQuotaConfigs = [
+    { user: employeeUser, tier: standardTier, remaining: 1640.0, deductibleSpent: 100.0 },
+    { user: execEmployee, tier: executiveTier, remaining: 7415.0, deductibleSpent: 50.0 },
+    { user: prodEmployee, tier: standardTier, remaining: 2776.0, deductibleSpent: 100.0 },
+    { user: salesEmployee, tier: standardTier, remaining: 2664.0, deductibleSpent: 100.0 },
+    { user: hrEmployee, tier: standardTier, remaining: 2824.0, deductibleSpent: 100.0 },
+    { user: opsEmployee, tier: standardTier, remaining: 3000.0, deductibleSpent: 0.0 },
+  ];
+
+  for (const eq of employeeQuotaConfigs) {
+    await prisma.userPolicyQuota.upsert({
+      where: {
+        userId_fiscalYear: {
+          userId: eq.user.id,
+          fiscalYear: currentYear,
+        },
+      },
+      update: {
+        annualLimit: eq.tier.annualLimit,
+        remainingBalance: eq.remaining,
+        cumulativeDeductibleSpent: eq.deductibleSpent,
+      },
+      create: {
+        userId: eq.user.id,
+        benefitTierId: eq.tier.id,
+        fiscalYear: currentYear,
+        annualLimit: eq.tier.annualLimit,
+        remainingBalance: eq.remaining,
+        cumulativeDeductibleSpent: eq.deductibleSpent,
+      },
+    });
+  }
 
   // 4. Seed Dynamic Compliance Rules (AST format)
   console.log('Seeding compliance rule AST definitions...');
 
-  // Rule 1: Hospital Qualification (Grade must be valid)
-  await prisma.complianceRule.upsert({
-    where: { code: 'RULE_HOSPITAL_GRADE' },
-    update: {},
-    create: {
+  const rules = [
+    {
       code: 'RULE_HOSPITAL_GRADE',
-      name: 'Hospital Qualification Requirement',
-      description: 'Medical services must be rendered by accredited Grade A, Grade 3A, or certified Specialist institutions.',
+      name: 'Accredited Healthcare Provider Requirement',
+      description: 'Medical services must be rendered by MOH-licensed Public Restructured Hospitals, Private Hospitals, or registered Specialist Medical Centres.',
       priority: 10,
       astDefinition: {
         type: 'COMPARISON',
         field: 'hospitalGrade',
         operator: 'IN',
-        value: ['GRADE_A', 'GRADE_3A', 'PUBLIC_HOSPITAL', 'SPECIALIST_CLINIC'],
+        value: ['PUBLIC_TERTIARY', 'PRIVATE_TERTIARY', 'SPECIALIST_CENTRE', 'COMMUNITY_HOSPITAL', 'GP_CLINIC'],
       },
-      isActive: true,
     },
-  });
-
-  // Rule 2: Single Dental Claim Cap ($1,000 threshold)
-  await prisma.complianceRule.upsert({
-    where: { code: 'RULE_DENTAL_CAP' },
-    update: {},
-    create: {
+    {
       code: 'RULE_DENTAL_CAP',
       name: 'Dental Single Claim Cap',
       description: 'Individual dental reimbursement claims must not exceed $1,000 without prior specialized authorization.',
@@ -252,29 +311,12 @@ async function main() {
         type: 'LOGICAL',
         operator: 'OR',
         children: [
-          {
-            type: 'COMPARISON',
-            field: 'category',
-            operator: 'NOT_EQUALS',
-            value: 'DENTAL',
-          },
-          {
-            type: 'COMPARISON',
-            field: 'totalAmount',
-            operator: 'LESS_EQUAL',
-            value: 1000,
-          },
+          { type: 'COMPARISON', field: 'category', operator: 'NOT_EQUALS', value: 'DENTAL' },
+          { type: 'COMPARISON', field: 'totalAmount', operator: 'LESS_EQUAL', value: 1000 },
         ],
       },
-      isActive: true,
     },
-  });
-
-  // Rule 3: Minimum Claim Validity & Invoice Items Required
-  await prisma.complianceRule.upsert({
-    where: { code: 'RULE_MIN_AMOUNT' },
-    update: {},
-    create: {
+    {
       code: 'RULE_MIN_AMOUNT',
       name: 'Minimum Claim Value Validation',
       description: 'Total claim amount must be strictly greater than $0 and have positive line-item totals.',
@@ -285,20 +327,263 @@ async function main() {
         operator: 'GREATER_THAN',
         value: 0,
       },
-      isActive: true,
     },
-  });
+  ];
 
-  // 5. Initial Seed Audit Log
+  for (const r of rules) {
+    await prisma.complianceRule.upsert({
+      where: { code: r.code },
+      update: { name: r.name, description: r.description, astDefinition: r.astDefinition },
+      create: {
+        code: r.code,
+        name: r.name,
+        description: r.description,
+        priority: r.priority,
+        astDefinition: r.astDefinition,
+        isActive: true,
+      },
+    });
+  }
+
+  // 5. Seed Realistic Multi-Department Claims with Itemizations & AST Logs (Singapore Context)
+  console.log('Seeding realistic multi-department claim trajectories (Singapore Healthcare MOH Framework)...');
+
+  const seedClaims = [
+    {
+      claimNumber: 'CLM-2026-ENG01',
+      user: employeeUser,
+      category: ClaimCategory.HOSPITALIZATION,
+      hospitalName: 'Singapore General Hospital (SGH)',
+      hospitalGrade: 'PUBLIC_TERTIARY',
+      invoiceDate: new Date('2026-06-15'),
+      totalAmount: 1200.0,
+      deductibleCovered: 100.0,
+      coPayRate: 0.8,
+      approvedAmount: 880.0,
+      outOfPocketAmount: 320.0,
+      status: ClaimStatus.SETTLED,
+      statusReason: 'Inpatient recovery subsidy settled via corporate treasury.',
+      reviewedBy: financeUser.id,
+      reviewedAt: new Date('2026-06-18'),
+      items: [
+        { description: 'Acute Inpatient Hospitalization (2 nights)', category: ClaimCategory.HOSPITALIZATION, unitPrice: 900.0, quantity: 1, totalPrice: 900.0 },
+        { description: 'Diagnostic Radiology & CT Scan', category: ClaimCategory.HOSPITALIZATION, unitPrice: 300.0, quantity: 1, totalPrice: 300.0 },
+      ],
+    },
+    {
+      claimNumber: 'CLM-2026-ENG02',
+      user: employeeUser,
+      category: ClaimCategory.DENTAL,
+      hospitalName: 'Novena Specialist Dental Care',
+      hospitalGrade: 'SPECIALIST_CENTRE',
+      invoiceDate: new Date('2026-07-20'),
+      totalAmount: 350.0,
+      deductibleCovered: 0.0,
+      coPayRate: 0.8,
+      approvedAmount: 280.0,
+      outOfPocketAmount: 70.0,
+      status: ClaimStatus.OFFICER_APPROVED,
+      statusReason: 'Dental prophylaxis & root canal approved by Officer.',
+      reviewedBy: officerUser.id,
+      reviewedAt: new Date('2026-07-22'),
+      items: [
+        { description: 'Root Canal Endodontic Therapy', category: ClaimCategory.DENTAL, unitPrice: 250.0, quantity: 1, totalPrice: 250.0 },
+        { description: 'Preventative Ultrasonic Dental Scaling', category: ClaimCategory.DENTAL, unitPrice: 100.0, quantity: 1, totalPrice: 100.0 },
+      ],
+    },
+    {
+      claimNumber: 'CLM-2026-ENG03',
+      user: employeeUser,
+      category: ClaimCategory.CONSULTATION,
+      hospitalName: 'National University Hospital (NUH) Outpatient Clinic',
+      hospitalGrade: 'PUBLIC_TERTIARY',
+      invoiceDate: new Date('2026-08-10'),
+      totalAmount: 250.0,
+      deductibleCovered: 0.0,
+      coPayRate: 0.8,
+      approvedAmount: 200.0,
+      outOfPocketAmount: 50.0,
+      status: ClaimStatus.AUTO_VALIDATED,
+      statusReason: 'Straight-through auto-validation passed all AST compliance checks.',
+      items: [
+        { description: 'Specialist Outpatient Consultation', category: ClaimCategory.CONSULTATION, unitPrice: 150.0, quantity: 1, totalPrice: 150.0 },
+        { description: 'Prescription Pharmaceuticals', category: ClaimCategory.MEDICATION, unitPrice: 100.0, quantity: 1, totalPrice: 100.0 },
+      ],
+    },
+    {
+      claimNumber: 'CLM-2026-EXEC01',
+      user: execEmployee,
+      category: ClaimCategory.HEALTH_SCREENING,
+      hospitalName: 'Gleneagles Hospital Executive Health Clinic',
+      hospitalGrade: 'PRIVATE_TERTIARY',
+      invoiceDate: new Date('2026-05-12'),
+      totalAmount: 650.0,
+      deductibleCovered: 50.0,
+      coPayRate: 0.9,
+      approvedAmount: 540.0,
+      outOfPocketAmount: 110.0,
+      status: ClaimStatus.SETTLED,
+      statusReason: 'Executive comprehensive wellness screening settled.',
+      reviewedBy: financeUser.id,
+      reviewedAt: new Date('2026-05-15'),
+      items: [
+        { description: 'Executive Comprehensive Biomarker Panel', category: ClaimCategory.HEALTH_SCREENING, unitPrice: 450.0, quantity: 1, totalPrice: 450.0 },
+        { description: 'Cardiovascular Stress & ECG Assessment', category: ClaimCategory.HEALTH_SCREENING, unitPrice: 200.0, quantity: 1, totalPrice: 200.0 },
+      ],
+    },
+    {
+      claimNumber: 'CLM-2026-PROD01',
+      user: prodEmployee,
+      category: ClaimCategory.OPTICAL,
+      hospitalName: 'Mount Elizabeth Specialist Eye & Vision Centre',
+      hospitalGrade: 'SPECIALIST_CENTRE',
+      invoiceDate: new Date('2026-06-25'),
+      totalAmount: 280.0,
+      deductibleCovered: 100.0,
+      coPayRate: 0.8,
+      approvedAmount: 144.0,
+      outOfPocketAmount: 136.0,
+      status: ClaimStatus.SETTLED,
+      statusReason: 'Prescription optical correction settled.',
+      reviewedBy: financeUser.id,
+      reviewedAt: new Date('2026-06-28'),
+      items: [
+        { description: 'Refractive Corneal & Optical Examination', category: ClaimCategory.OPTICAL, unitPrice: 80.0, quantity: 1, totalPrice: 80.0 },
+        { description: 'Prescription Corrective Lenses', category: ClaimCategory.OPTICAL, unitPrice: 200.0, quantity: 1, totalPrice: 200.0 },
+      ],
+    },
+    {
+      claimNumber: 'CLM-2026-SALES01',
+      user: salesEmployee,
+      category: ClaimCategory.CONSULTATION,
+      hospitalName: 'SingHealth Polyclinic & Community Hospital',
+      hospitalGrade: 'COMMUNITY_HOSPITAL',
+      invoiceDate: new Date('2026-08-05'),
+      totalAmount: 420.0,
+      deductibleCovered: 100.0,
+      coPayRate: 0.8,
+      approvedAmount: 256.0,
+      outOfPocketAmount: 164.0,
+      status: ClaimStatus.FINANCE_APPROVED,
+      statusReason: 'Approved by Finance, scheduled in next weekly payout run.',
+      reviewedBy: financeUser.id,
+      reviewedAt: new Date('2026-08-08'),
+      items: [
+        { description: 'Urgent Care Outpatient Triage & Treatment', category: ClaimCategory.CONSULTATION, unitPrice: 220.0, quantity: 1, totalPrice: 220.0 },
+        { description: 'Antibiotic Therapy & Medications', category: ClaimCategory.MEDICATION, unitPrice: 200.0, quantity: 1, totalPrice: 200.0 },
+      ],
+    },
+    {
+      claimNumber: 'CLM-2026-HR01',
+      user: hrEmployee,
+      category: ClaimCategory.CONSULTATION,
+      hospitalName: 'Tan Tock Seng Hospital (TTSH) Specialist Outpatient Clinic',
+      hospitalGrade: 'PUBLIC_TERTIARY',
+      invoiceDate: new Date('2026-07-15'),
+      totalAmount: 220.0,
+      deductibleCovered: 100.0,
+      coPayRate: 0.8,
+      approvedAmount: 96.0,
+      outOfPocketAmount: 124.0,
+      status: ClaimStatus.SETTLED,
+      statusReason: 'Outpatient consultation reimbursed.',
+      reviewedBy: financeUser.id,
+      reviewedAt: new Date('2026-07-18'),
+      items: [
+        { description: 'Dermatology Consultation & Prescription', category: ClaimCategory.CONSULTATION, unitPrice: 220.0, quantity: 1, totalPrice: 220.0 },
+      ],
+    },
+    {
+      claimNumber: 'CLM-2026-OPS01',
+      user: opsEmployee,
+      category: ClaimCategory.DENTAL,
+      hospitalName: 'Raffles Medical Family Dental Clinic',
+      hospitalGrade: 'GP_CLINIC',
+      invoiceDate: new Date('2026-08-22'),
+      totalAmount: 1250.0,
+      deductibleCovered: 0.0,
+      coPayRate: 0.8,
+      approvedAmount: 0.0,
+      outOfPocketAmount: 1250.0,
+      status: ClaimStatus.FLAGGED_REVIEW,
+      statusReason: 'Triggered RULE_DENTAL_CAP (Exceeds $1,000 dental threshold). Pending officer adjudication.',
+      items: [
+        { description: 'Complex Titanium Dental Implant Surgery', category: ClaimCategory.DENTAL, unitPrice: 1250.0, quantity: 1, totalPrice: 1250.0 },
+      ],
+    },
+  ];
+
+  for (const sc of seedClaims) {
+    const existingClaim = await prisma.claim.findUnique({
+      where: { claimNumber: sc.claimNumber },
+    });
+
+    if (!existingClaim) {
+      const createdClaim = await prisma.claim.create({
+        data: {
+          claimNumber: sc.claimNumber,
+          userId: sc.user.id,
+          fiscalYear: currentYear,
+          category: sc.category,
+          hospitalName: sc.hospitalName,
+          hospitalGrade: sc.hospitalGrade,
+          invoiceDate: sc.invoiceDate,
+          totalAmount: sc.totalAmount,
+          deductibleCovered: sc.deductibleCovered,
+          coPayRate: sc.coPayRate,
+          approvedAmount: sc.approvedAmount,
+          outOfPocketAmount: sc.outOfPocketAmount,
+          status: sc.status,
+          statusReason: sc.statusReason,
+          reviewedBy: sc.reviewedBy,
+          reviewedAt: sc.reviewedAt,
+          items: {
+            create: sc.items.map((it) => ({
+              description: it.description,
+              category: it.category,
+              unitPrice: it.unitPrice,
+              quantity: it.quantity,
+              totalPrice: it.totalPrice,
+              isEligible: true,
+            })),
+          },
+        },
+      });
+
+      // Add Rule Evaluation Logs for AST telemetry
+      await prisma.ruleEvaluationLog.create({
+        data: {
+          claimId: createdClaim.id,
+          ruleCode: 'RULE_HOSPITAL_GRADE',
+          ruleName: 'Hospital Qualification Requirement',
+          isPassed: sc.hospitalGrade !== 'CLINIC',
+          reason: sc.hospitalGrade === 'CLINIC' ? 'Unaccredited clinic requires manual review' : 'Institution verified Grade A / 3A',
+        },
+      });
+
+      await prisma.ruleEvaluationLog.create({
+        data: {
+          claimId: createdClaim.id,
+          ruleCode: 'RULE_DENTAL_CAP',
+          ruleName: 'Dental Single Claim Cap',
+          isPassed: sc.category !== ClaimCategory.DENTAL || sc.totalAmount <= 1000,
+          reason: sc.category === ClaimCategory.DENTAL && sc.totalAmount > 1000 ? 'Dental claim exceeds $1,000 threshold' : 'Complies with dental cap',
+        },
+      });
+    }
+  }
+
+  // 6. Initial Seed Audit Log
   await prisma.auditLog.create({
     data: {
       action: 'SYSTEM_INITIALIZATION',
       targetResource: 'DATABASE_SEED',
       details: {
         initializedRoles: Object.values(Role),
-        seededUsersCount: 6,
+        seededUsersCount: 10,
         seededTiersCount: 3,
         seededRulesCount: 3,
+        seededClaimsCount: seedClaims.length,
         fiscalYear: currentYear,
       },
     },

@@ -13,6 +13,7 @@ import {
   UpdateUserRole,
   UpdateUserStatus,
   AdminCreateUser,
+  AdminUpdateUserDto,
   UpdateProfileDto,
 } from '@healthclaim/shared';
 
@@ -51,7 +52,7 @@ export class UsersService {
       throw new NotFoundException('User profile not found');
     }
 
-    const activeQuota = user.quotas[0] || null;
+    const activeQuota = user.role === UserRole.EMPLOYEE ? user.quotas[0] || null : null;
 
     return {
       id: user.id,
@@ -195,7 +196,8 @@ export class UsersService {
     ]);
 
     const formattedUsers = users.map((u) => {
-      const quota = u.quotas[0];
+      const isEmployee = u.role === UserRole.EMPLOYEE;
+      const quota = isEmployee ? u.quotas[0] : null;
       return {
         id: u.id,
         email: u.email,
@@ -206,7 +208,7 @@ export class UsersService {
         department: u.department,
         isEmailVerified: u.isEmailVerified,
         createdAt: u.createdAt,
-        benefitTier: quota?.benefitTier?.name || 'Unassigned',
+        benefitTier: isEmployee ? (quota?.benefitTier?.name || 'Unassigned') : '—',
         remainingBalance: quota ? Number(quota.remainingBalance) : 0,
         annualLimit: quota ? Number(quota.annualLimit) : 0,
       };
@@ -360,5 +362,84 @@ export class UsersService {
     });
 
     return user;
+  }
+
+  /**
+   * Comprehensive user profile and credentials update (Admin only)
+   */
+  async adminUpdateUserProfile(
+    targetUserId: string,
+    dto: AdminUpdateUserDto,
+    actorId: string,
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) {
+      throw new NotFoundException('Target user not found');
+    }
+
+    const updateData: any = {};
+    if (dto.firstName) updateData.firstName = dto.firstName.trim();
+    if (dto.lastName) updateData.lastName = dto.lastName.trim();
+    if (dto.department !== undefined) updateData.department = dto.department?.trim() || null;
+    if (dto.status) {
+      if (targetUserId === actorId && dto.status !== UserStatus.ACTIVE) {
+        throw new BadRequestException('Administrators cannot suspend their own account');
+      }
+      updateData.status = dto.status;
+    }
+    if (dto.role) {
+      if (targetUserId === actorId && dto.role !== UserRole.SYSTEM_ADMIN) {
+        throw new BadRequestException('Administrators cannot revoke their own admin privileges');
+      }
+      updateData.role = dto.role;
+    }
+
+    if (dto.email && dto.email.toLowerCase().trim() !== user.email) {
+      const targetEmail = dto.email.toLowerCase().trim();
+      const existing = await this.prisma.user.findUnique({ where: { email: targetEmail } });
+      if (existing && existing.id !== targetUserId) {
+        throw new ConflictException('An account with this email address already exists');
+      }
+      updateData.email = targetEmail;
+    }
+
+    if (dto.resetPassword) {
+      updateData.passwordHash = await bcrypt.hash(dto.resetPassword, 10);
+    }
+
+    if (dto.role && dto.role !== UserRole.EMPLOYEE) {
+      await this.prisma.userPolicyQuota.deleteMany({ where: { userId: targetUserId } });
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: targetUserId },
+      data: updateData,
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'ADMIN_UPDATE_USER_PROFILE',
+        targetResource: 'USER',
+        targetResourceId: targetUserId,
+        details: {
+          targetEmail: updated.email,
+          updatedFields: Object.keys(updateData).filter((k) => k !== 'passwordHash'),
+          passwordReset: !!dto.resetPassword,
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      email: updated.email,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+      role: updated.role,
+      status: updated.status,
+      department: updated.department,
+      isEmailVerified: updated.isEmailVerified,
+      updatedAt: updated.updatedAt,
+    };
   }
 }

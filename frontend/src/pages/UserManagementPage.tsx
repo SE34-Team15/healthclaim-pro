@@ -30,6 +30,10 @@ import {
   Check,
   Shield,
   Layers,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  KeyRound,
 } from 'lucide-react';
 
 interface UserRecord {
@@ -61,6 +65,12 @@ export const UserManagementPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
   // New User Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
@@ -84,17 +94,70 @@ export const UserManagementPage: React.FC = () => {
   const [selectedTierId, setSelectedTierId] = useState('');
   const [assigning, setAssigning] = useState(false);
 
+  // Edit User Profile & Credentials Modal
+  const [editUserModalOpen, setEditUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editDepartment, setEditDepartment] = useState('');
+  const [editRole, setEditRole] = useState<UserRole>(UserRole.EMPLOYEE);
+  const [editStatus, setEditStatus] = useState<UserStatus>(UserStatus.ACTIVE);
+  const [editResetPassword, setEditResetPassword] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleOpenEditModal = (u: UserRecord) => {
+    setEditingUser(u);
+    setEditFirstName(u.firstName);
+    setEditLastName(u.lastName);
+    setEditEmail(u.email);
+    setEditDepartment(u.department || (departments[0]?.name || ''));
+    setEditRole(u.role);
+    setEditStatus(u.status);
+    setEditResetPassword('');
+    setEditUserModalOpen(true);
+  };
+
+  const handleSaveEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setSavingEdit(true);
+    try {
+      await apiClient.patch(`/users/${editingUser.id}/admin-profile`, {
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim(),
+        email: editEmail.trim(),
+        department: editDepartment || undefined,
+        role: editRole,
+        status: editStatus,
+        resetPassword: editResetPassword.trim() || undefined,
+      });
+      toast.success(`Member profile for ${editEmail} updated successfully`);
+      setEditUserModalOpen(false);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update member profile');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (search) params.append('search', search);
+      params.append('page', String(page));
+      params.append('pageSize', String(pageSize));
+      if (search.trim()) params.append('search', search.trim());
       if (roleFilter && roleFilter !== 'ALL') params.append('role', roleFilter);
 
-      const data = await apiClient.get<any, { items: UserRecord[] }>(
-        `/users?${params.toString()}`,
-      );
+      const data = await apiClient.get<
+        any,
+        { items: UserRecord[]; total: number; page: number; pageSize: number; totalPages: number }
+      >(`/users?${params.toString()}`);
       setUsers(data.items);
+      setTotal(data.total);
+      setTotalPages(data.totalPages);
     } catch (err: any) {
       toast.error(err.message || 'Failed to fetch users');
     } finally {
@@ -128,12 +191,16 @@ export const UserManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
+  }, [page, pageSize, roleFilter]);
+
+  useEffect(() => {
     fetchTiers();
     fetchDepartments();
-  }, [roleFilter]);
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setPage(1);
     fetchUsers();
   };
 
@@ -335,27 +402,22 @@ export const UserManagementPage: React.FC = () => {
                 users.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-50/80 transition-colors duration-150 group">
                     <td className="py-3.5 px-5">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs shrink-0">
-                          {u.firstName[0]}{u.lastName[0]}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-950">
-                            {u.firstName} {u.lastName}
-                          </p>
-                          <p className="text-[11px] text-slate-400 font-mono">{u.email}</p>
-                        </div>
+                      <div>
+                        <p className="font-semibold text-slate-950 text-xs">
+                          {u.firstName} {u.lastName}
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">{u.email}</p>
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600 font-medium">
                       {u.department || '—'}
                     </td>
-                    <td className="py-3.5 px-4 w-44">
+                    <td className="py-3.5 px-4 w-48 min-w-[180px]">
                       <Select
                         value={u.role}
                         onValueChange={(val) => handleRoleChange(u.id, val as UserRole)}
                       >
-                        <SelectTrigger className="h-8">
+                        <SelectTrigger className="h-8 px-2.5 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -368,10 +430,14 @@ export const UserManagementPage: React.FC = () => {
                       </Select>
                     </td>
                     <td className="py-3.5 px-4 font-medium text-slate-700">
-                      {u.benefitTier}
+                      {u.role === UserRole.EMPLOYEE ? (
+                        u.benefitTier
+                      ) : (
+                        <span className="text-slate-400 font-mono">—</span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4">
-                      {u.annualLimit > 0 ? (
+                      {u.role === UserRole.EMPLOYEE && u.annualLimit > 0 ? (
                         <div>
                           <span className="font-bold text-[#0a2540]">
                             ${u.remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -379,28 +445,100 @@ export const UserManagementPage: React.FC = () => {
                           <span className="text-slate-400 text-[11px]"> / ${u.annualLimit.toLocaleString()}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-slate-400 font-mono">—</span>
                       )}
                     </td>
                     <td className="py-3.5 px-5 text-right">
-                      {u.role === UserRole.EMPLOYEE && (
+                      <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setAssignModalUser(u);
-                            setSelectedTierId(tiers[0]?.id || '');
-                          }}
+                          onClick={() => handleOpenEditModal(u)}
+                          className="h-7 px-2.5 text-xs gap-1.5 cursor-pointer bg-white"
                         >
-                          Change Tier
+                          <Pencil className="h-3 w-3" />
+                          <span>Edit</span>
                         </Button>
-                      )}
+
+                        {u.role === UserRole.EMPLOYEE && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setAssignModalUser(u);
+                              setSelectedTierId(tiers[0]?.id || '');
+                            }}
+                            className="h-7 px-2.5 text-xs cursor-pointer bg-white"
+                          >
+                            Change Tier
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="bg-slate-50/60 border-t border-slate-200/80 px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3 text-slate-500">
+            <span>
+              Showing <strong className="text-slate-800">{users.length > 0 ? (page - 1) * pageSize + 1 : 0}</strong> to{' '}
+              <strong className="text-slate-800">{Math.min(page * pageSize, total)}</strong> of{' '}
+              <strong className="text-slate-800">{total}</strong> members
+            </span>
+            <div className="flex items-center gap-1.5 pl-3 border-l border-slate-200">
+              <span className="text-[11px]">Rows per page:</span>
+              <div className="w-16">
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(val) => {
+                    setPageSize(Number(val));
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-7 text-xs bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500 text-[11px] font-mono mr-2">
+              Page {page} of {totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="h-7 px-2 text-xs gap-1 bg-white cursor-pointer"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              <span>Previous</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || loading}
+              className="h-7 px-2 text-xs gap-1 bg-white cursor-pointer"
+            >
+              <span>Next</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -731,6 +869,154 @@ export const UserManagementPage: React.FC = () => {
               </table>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Member Profile & Credentials Dialog */}
+      <Dialog open={editUserModalOpen} onOpenChange={setEditUserModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-[#0a2540]">
+              <Pencil className="h-4 w-4 text-slate-700" />
+              Edit Member Profile & Credentials
+            </DialogTitle>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Update personal identity, corporate department, RBAC role, and account credentials.
+            </p>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveEditUser} className="space-y-3.5 mt-2 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">First Name</label>
+                <Input
+                  type="text"
+                  required
+                  value={editFirstName}
+                  onChange={(e) => setEditFirstName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Last Name</label>
+                <Input
+                  type="text"
+                  required
+                  value={editLastName}
+                  onChange={(e) => setEditLastName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Corporate Email</label>
+              <Input
+                type="email"
+                required
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Corporate Department</label>
+              <Select
+                value={editDepartment}
+                onValueChange={setEditDepartment}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select corporate department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* Keep current custom department if not in list */}
+                  {editDepartment && !departments.some((d) => d.name === editDepartment) && (
+                    <SelectItem value={editDepartment}>
+                      <span>{editDepartment}</span>
+                      <span className="ml-2 text-[10px] text-slate-400 font-mono">(Custom)</span>
+                    </SelectItem>
+                  )}
+                  {departments
+                    .filter((d) => d.isActive)
+                    .map((dept) => (
+                      <SelectItem key={dept.id} value={dept.name}>
+                        <span>{dept.name}</span>
+                        <span className="ml-2 text-[10px] text-slate-400 font-mono">({dept.code})</span>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Enterprise Role</label>
+                <Select
+                  value={editRole}
+                  onValueChange={(val) => setEditRole(val as UserRole)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UserRole.EMPLOYEE}>Employee</SelectItem>
+                    <SelectItem value={UserRole.CLAIM_OFFICER}>Claim Officer</SelectItem>
+                    <SelectItem value={UserRole.FINANCE_MANAGER}>Finance Manager</SelectItem>
+                    <SelectItem value={UserRole.SYSTEM_ADMIN}>System Admin</SelectItem>
+                    <SelectItem value={UserRole.SECURITY_AUDITOR}>Security Auditor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Account Status</label>
+                <Select
+                  value={editStatus}
+                  onValueChange={(val) => setEditStatus(val as UserStatus)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UserStatus.ACTIVE}>Active</SelectItem>
+                    <SelectItem value={UserStatus.SUSPENDED}>Suspended</SelectItem>
+                    <SelectItem value={UserStatus.INACTIVE}>Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50/70 border border-amber-200/70 rounded-xl space-y-1.5">
+              <div className="flex items-center gap-1.5 text-amber-800 font-semibold text-[11px]">
+                <KeyRound className="h-3.5 w-3.5" />
+                Force Password Reset (Optional)
+              </div>
+              <Input
+                type="password"
+                placeholder="Leave blank to keep existing password"
+                value={editResetPassword}
+                onChange={(e) => setEditResetPassword(e.target.value)}
+                className="h-8 text-xs bg-white"
+              />
+              <p className="text-[10px] text-amber-700/80 leading-tight">
+                Entering a new password will immediately override this user's login credentials.
+              </p>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditUserModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={savingEdit}
+              >
+                {savingEdit ? 'Saving...' : 'Save Profile Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
