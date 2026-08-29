@@ -219,6 +219,15 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: '/language:javascript-typescript'
+          output: '../results'
+
+      - name: Upload CodeQL SARIF Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codeql-sast-report
+          path: ../results/*.sarif
+          retention-days: 14
 
   # ============================================================================
   # STAGE 5: SCA - DEPENDENCY REVIEW & SUPPLY CHAIN SECURITY
@@ -301,17 +310,34 @@ jobs:
 
       - name: Start Server for DAST Scanning
         run: |
-          node backend/dist/main.js &
-          sleep 5
+          pnpm --filter backend start:prod &
+          for i in $(seq 1 30); do
+            if curl -s http://127.0.0.1:4000/api/v1/health | grep -q "healthy"; then
+              echo "Backend is healthy and ready for DAST scan."
+              break
+            fi
+            echo "Waiting for backend server on port 4000... ($i/30)"
+            sleep 1
+          done
 
       - name: OWASP ZAP Baseline Dynamic Penetration Scan
         uses: zaproxy/action-baseline@v0.14.0
         with:
           target: 'http://localhost:4000/api/v1/health'
-          rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a'
           allow_issue_writing: false
           fail_action: false
+
+      - name: Upload OWASP ZAP DAST Security Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-zap-dast-report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          retention-days: 14
 
   # ============================================================================
   # STAGE 7: CD - BUILD DOCKER IMAGE & PUSH TO AMAZON ECR
@@ -343,6 +369,25 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # ------------------------------------------------------------------------
+      # OIDC Diagnostic: Decode and inspect GitHub OIDC Claims
+      # ------------------------------------------------------------------------
+      - name: Inspect GitHub OIDC Token Claims
+        run: |
+          echo "=== Fetching GitHub OIDC Token Payload ==="
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -r '.value')
+          if [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ]; then
+            echo "Successfully generated GitHub OIDC JWT."
+            echo "--- Decoded OIDC Payload (Claims) ---"
+            echo "$TOKEN" | jq -R 'split(".") | .[1] | @base64d | fromjson'
+            echo "====================================="
+          else
+            echo "Failed to retrieve GitHub OIDC token. Check permissions: id-token: write"
+          fi
+
+      # ------------------------------------------------------------------------
+      # AWS Authentication via OIDC (Zero Permanent Keys)
+      # ------------------------------------------------------------------------
       - name: Configure AWS Credentials with OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -377,10 +422,10 @@ jobs:
       - name: Trigger AWS ECS Rolling Update (If Configured)
         if: env.ECS_CLUSTER != '' && env.ECS_SERVICE != ''
         run: |
-          echo "🚀 Dispatching zero-downtime rolling update to ECS Cluster: $ECS_CLUSTER, Service: $ECS_SERVICE..."
+          echo "Dispatching zero-downtime rolling update to ECS Cluster: $ECS_CLUSTER, Service: $ECS_SERVICE..."
           aws ecs update-service \
             --cluster "$ECS_CLUSTER" \
             --service "$ECS_SERVICE" \
             --force-new-deployment \
             --region "$AWS_REGION"
-          echo "✅ Rolling deployment dispatched successfully."
+          echo "Rolling deployment dispatched successfully."
