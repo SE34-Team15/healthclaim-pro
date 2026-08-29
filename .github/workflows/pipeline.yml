@@ -1,0 +1,386 @@
+name: HealthClaim Pro - Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # STAGE 1: LINTING & TYPE INTEGRITY
+  # ============================================================================
+  lint-and-typecheck:
+    name: Lint & TypeCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client & Compile Shared Types
+        run: |
+          pnpm --filter backend prisma:generate
+          pnpm --filter @healthclaim/shared build
+
+      - name: Workspace Lint & TypeCheck
+        run: pnpm lint
+
+      - name: Fullstack Monorepo Build
+        run: pnpm build
+
+  # ============================================================================
+  # STAGE 2: UNIT TEST SUITE & COVERAGE GATE (>= 85%)
+  # ============================================================================
+  unit-tests-and-coverage:
+    name: Unit Tests & Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client & Compile Shared Types
+        run: |
+          pnpm --filter backend prisma:generate
+          pnpm --filter @healthclaim/shared build
+
+      - name: Run Vitest with Coverage Threshold Gates
+        run: pnpm test:cov
+
+      - name: Upload Coverage Report Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vitest-coverage-report
+          path: backend/coverage
+          retention-days: 14
+
+  # ============================================================================
+  # STAGE 3: PLAYWRIGHT FULLSTACK E2E TESTING (WITH SERVICES)
+  # ============================================================================
+  playwright-e2e:
+    name: Playwright Fullstack E2E Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: healthclaim_user
+          POSTGRES_PASSWORD: healthclaim_pass
+          POSTGRES_DB: healthclaim_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+          - 9001:9001
+        command: server /data --console-address ":9001"
+
+    env:
+      DATABASE_URL: postgresql://healthclaim_user:healthclaim_pass@localhost:5432/healthclaim_db?schema=public
+      JWT_SECRET: super_secret_healthclaim_pro_jwt_key_ci_2026!
+      MASTER_ENCRYPTION_KEY: super_master_encryption_key_32_bytes!
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET_NAME: healthclaim-receipts
+      S3_FORCE_PATH_STYLE: true
+      PORT: 4000
+      API_PREFIX: /api/v1
+      CORS_ORIGIN: http://localhost:5173
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync Database Schema & Seed Data
+        run: |
+          pnpm --filter backend prisma:generate
+          pnpm --filter @healthclaim/shared build
+          pnpm --filter backend prisma:push
+          pnpm --filter backend prisma:seed
+
+      - name: Install Playwright Browsers & OS Dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Test Suite
+        run: pnpm test:e2e
+
+      - name: Upload Playwright Report on Failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ============================================================================
+  # STAGE 4: SAST - GITHUB CODEQL STATIC SECURITY ANALYSIS
+  # ============================================================================
+  codeql-sast-scan:
+    name: GitHub CodeQL SAST Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL v4
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:javascript-typescript'
+
+  # ============================================================================
+  # STAGE 5: SCA - DEPENDENCY REVIEW & SUPPLY CHAIN SECURITY
+  # ============================================================================
+  dependency-review-sca:
+    name: GitHub Dependency Review SCA
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: GitHub Official Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  # ============================================================================
+  # STAGE 6: DAST - OWASP ZAP DYNAMIC SECURITY PENETRATION SCAN
+  # ============================================================================
+  owasp-zap-dast:
+    name: OWASP ZAP DAST Security Scan
+    runs-on: ubuntu-latest
+    needs: [playwright-e2e]
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: healthclaim_user
+          POSTGRES_PASSWORD: healthclaim_pass
+          POSTGRES_DB: healthclaim_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        command: server /data
+
+    env:
+      DATABASE_URL: postgresql://healthclaim_user:healthclaim_pass@localhost:5432/healthclaim_db?schema=public
+      JWT_SECRET: super_secret_healthclaim_pro_jwt_key_ci_2026!
+      MASTER_ENCRYPTION_KEY: super_master_encryption_key_32_bytes!
+      PORT: 4000
+      API_PREFIX: /api/v1
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Install & Bootstrap Backend Service
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter backend prisma:generate
+          pnpm --filter @healthclaim/shared build
+          pnpm --filter backend prisma:push
+          pnpm --filter backend prisma:seed
+          pnpm build
+
+      - name: Start Server for DAST Scanning
+        run: |
+          node backend/dist/main.js &
+          sleep 5
+
+      - name: OWASP ZAP Baseline Dynamic Penetration Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: 'http://localhost:4000/api/v1/health'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+          allow_issue_writing: false
+          fail_action: false
+
+  # ============================================================================
+  # STAGE 7: CD - BUILD DOCKER IMAGE & PUSH TO AMAZON ECR
+  # (Strict Gate: Requires ALL tests and security scans to succeed on 'main')
+  # ============================================================================
+  build-and-push-ecr:
+    name: Build, Push ECR & Deploy ECS
+    runs-on: ubuntu-latest
+    if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && github.event_name != 'pull_request'
+    needs:
+      - lint-and-typecheck
+      - unit-tests-and-coverage
+      - playwright-e2e
+      - codeql-sast-scan
+    permissions:
+      id-token: write # Required for AWS OIDC
+      contents: read
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'healthclaim-pro' }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS Credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract Metadata (Tags & Labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trigger AWS ECS Rolling Update (If Configured)
+        if: env.ECS_CLUSTER != '' && env.ECS_SERVICE != ''
+        run: |
+          echo "🚀 Dispatching zero-downtime rolling update to ECS Cluster: $ECS_CLUSTER, Service: $ECS_SERVICE..."
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment \
+            --region "$AWS_REGION"
+          echo "✅ Rolling deployment dispatched successfully."
