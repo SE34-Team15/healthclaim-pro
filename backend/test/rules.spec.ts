@@ -151,14 +151,91 @@ describe('Dynamic Compliance Rule Engine (TDD - Composite + Specification Patter
           category: 'COSMETIC',
         }).isPassed,
       ).toBe(false);
+    });
 
-      // Invalid: Unaccredited hospital
-      expect(
-        compiledSpec.isSatisfiedBy({
-          hospitalGrade: 'UNKNOWN',
-          category: 'SURGERY',
-        }).isPassed,
-      ).toBe(false);
+    it('should evaluate NOT_EQUALS, LESS_THAN, GREATER_EQUAL, NOT_IN, CONTAINS', () => {
+      const neSpec = new ComparisonSpecification<{ category: string }>(
+        'category',
+        ComparisonOperator.NOT_EQUALS,
+        'DENTAL',
+      );
+      expect(neSpec.isSatisfiedBy({ category: 'SURGERY' }).isPassed).toBe(true);
+      expect(neSpec.isSatisfiedBy({ category: 'DENTAL' }).isPassed).toBe(false);
+
+      const ltSpec = new ComparisonSpecification<{ amount: number }>(
+        'amount',
+        ComparisonOperator.LESS_THAN,
+        100,
+      );
+      expect(ltSpec.isSatisfiedBy({ amount: 99 }).isPassed).toBe(true);
+      expect(ltSpec.isSatisfiedBy({ amount: 100 }).isPassed).toBe(false);
+
+      const geSpec = new ComparisonSpecification<{ amount: number }>(
+        'amount',
+        ComparisonOperator.GREATER_EQUAL,
+        100,
+      );
+      expect(geSpec.isSatisfiedBy({ amount: 100 }).isPassed).toBe(true);
+      expect(geSpec.isSatisfiedBy({ amount: 99 }).isPassed).toBe(false);
+
+      const notInSpec = new ComparisonSpecification<{ grade: string }>(
+        'grade',
+        ComparisonOperator.NOT_IN,
+        ['UNACCREDITED'],
+      );
+      expect(notInSpec.isSatisfiedBy({ grade: 'GRADE_A' }).isPassed).toBe(true);
+      expect(notInSpec.isSatisfiedBy({ grade: 'UNACCREDITED' }).isPassed).toBe(false);
+
+      const containsStrSpec = new ComparisonSpecification<{ name: string }>(
+        'name',
+        ComparisonOperator.CONTAINS,
+        'Hospital',
+      );
+      expect(containsStrSpec.isSatisfiedBy({ name: 'General Hospital' }).isPassed).toBe(true);
+      expect(containsStrSpec.isSatisfiedBy({ name: 'Private Clinic' }).isPassed).toBe(false);
+
+      const containsArrSpec = new ComparisonSpecification<{ tags: string[] }>(
+        'tags',
+        ComparisonOperator.CONTAINS,
+        'urgent',
+      );
+      expect(containsArrSpec.isSatisfiedBy({ tags: ['urgent', 'inpatient'] }).isPassed).toBe(true);
+      expect(containsArrSpec.isSatisfiedBy({ tags: ['routine'] }).isPassed).toBe(false);
+
+      const unknownOpSpec = new ComparisonSpecification<{ name: string }>(
+        'name',
+        'UNKNOWN_OP' as any,
+        'test',
+      );
+      expect(unknownOpSpec.isSatisfiedBy({ name: 'test' }).isPassed).toBe(false);
+    });
+
+    it('should support fluent chaining via and(), or(), and not() on BaseSpecification', () => {
+      const specA = new ComparisonSpecification<any>('totalAmount', ComparisonOperator.GREATER_THAN, 0);
+      const specB = new ComparisonSpecification<any>('hospitalGrade', ComparisonOperator.EQUALS, 'GRADE_A');
+
+      const chainedAnd = specA.and(specB);
+      expect(chainedAnd.isSatisfiedBy({ totalAmount: 100, hospitalGrade: 'GRADE_A' }).isPassed).toBe(true);
+      expect(chainedAnd.isSatisfiedBy({ totalAmount: 0, hospitalGrade: 'GRADE_A' }).isPassed).toBe(false);
+
+      const chainedOr = specA.or(specB);
+      expect(chainedOr.isSatisfiedBy({ totalAmount: 0, hospitalGrade: 'GRADE_A' }).isPassed).toBe(true);
+      expect(chainedOr.isSatisfiedBy({ totalAmount: 0, hospitalGrade: 'GRADE_B' }).isPassed).toBe(false);
+
+      const chainedNot = specA.not();
+      expect(chainedNot.isSatisfiedBy({ totalAmount: 0 }).isPassed).toBe(true);
+      expect(chainedNot.isSatisfiedBy({ totalAmount: 100 }).isPassed).toBe(false);
+    });
+
+    it('should throw on invalid AST node or operator in RuleAstCompiler', () => {
+      expect(() =>
+        RuleAstCompiler.compile({ type: 'INVALID' } as any),
+      ).toThrow('Invalid AST Node structure');
+
+      expect(() =>
+        RuleAstCompiler.compile({ type: 'LOGICAL', operator: 'INVALID_OP' as any, children: [] }),
+      ).toThrow('Unsupported logical operator');
     });
   });
 });
+

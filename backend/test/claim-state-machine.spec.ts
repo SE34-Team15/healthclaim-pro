@@ -1,5 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ClaimStateMachine } from '../src/claims/state-machine/claim-state-machine';
+import { CancelledState } from '../src/claims/state-machine/states/cancelled.state';
+import { OfficerRejectedState } from '../src/claims/state-machine/states/officer-rejected.state';
+import { SettledState } from '../src/claims/state-machine/states/settled.state';
 import { ClaimStatus, UserRole } from '@healthclaim/shared';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
@@ -146,6 +149,101 @@ describe('ClaimStateMachine (GoF State Pattern Finite State Machine)', () => {
         }),
       );
     });
+
+    it('should disburse without quota update if quota record does not exist', async () => {
+      mockTx.userPolicyQuota.findUnique.mockResolvedValue(null);
+      const actor = { id: 'fin-1', role: UserRole.FINANCE_MANAGER };
+      const updated = await stateMachine.transition(
+        claim,
+        ClaimStatus.SETTLED,
+        actor,
+        'Direct disbursement',
+        mockTx,
+      );
+      expect(updated.status).toBe(ClaimStatus.SETTLED);
+      expect(mockTx.userPolicyQuota.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject invalid transition from OfficerApprovedState', async () => {
+      const actor = { id: 'officer-1', role: UserRole.CLAIM_OFFICER };
+      await expect(
+        stateMachine.transition(claim, ClaimStatus.SUBMITTED, actor, undefined, mockTx),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('FinanceApprovedState', () => {
+    const financeApprovedClaim = {
+      id: 'claim-123',
+      claimNumber: 'CLM-2026-TEST',
+      userId: 'emp-1',
+      fiscalYear: 2026,
+      status: ClaimStatus.FINANCE_APPROVED,
+      approvedAmount: 350,
+      deductibleCovered: 50,
+    };
+
+    it('should allow Finance Manager to settle or cancel a finance approved claim', async () => {
+      const finActor = { id: 'fin-1', role: UserRole.FINANCE_MANAGER };
+      const settled = await stateMachine.transition(
+        financeApprovedClaim,
+        ClaimStatus.SETTLED,
+        finActor,
+        undefined,
+        mockTx,
+      );
+      expect(settled.status).toBe(ClaimStatus.SETTLED);
+
+      const cancelled = await stateMachine.transition(
+        financeApprovedClaim,
+        ClaimStatus.CANCELLED,
+        finActor,
+        'Cancelled by finance',
+        mockTx,
+      );
+      expect(cancelled.status).toBe(ClaimStatus.CANCELLED);
+    });
+
+    it('should forbid employee or unauthorized role from settling finance approved claim', async () => {
+      const empActor = { id: 'emp-1', role: UserRole.EMPLOYEE };
+      await expect(
+        stateMachine.transition(financeApprovedClaim, ClaimStatus.SETTLED, empActor, undefined, mockTx),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('CancelledState & OfficerRejectedState (Terminal Locking)', () => {
+    const cancelledClaim = {
+      id: 'claim-123',
+      claimNumber: 'CLM-2026-CANCELLED',
+      userId: 'emp-1',
+      fiscalYear: 2026,
+      status: ClaimStatus.CANCELLED,
+      approvedAmount: 0,
+    };
+
+    const rejectedClaim = {
+      id: 'claim-123',
+      claimNumber: 'CLM-2026-REJECTED',
+      userId: 'emp-1',
+      fiscalYear: 2026,
+      status: ClaimStatus.OFFICER_REJECTED,
+      approvedAmount: 0,
+    };
+
+    it('should reject transitions from CancelledState', async () => {
+      const actor = { id: 'admin-1', role: UserRole.SYSTEM_ADMIN };
+      await expect(
+        stateMachine.transition(cancelledClaim, ClaimStatus.SUBMITTED, actor, undefined, mockTx),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject transitions from OfficerRejectedState', async () => {
+      const actor = { id: 'admin-1', role: UserRole.SYSTEM_ADMIN };
+      await expect(
+        stateMachine.transition(rejectedClaim, ClaimStatus.SUBMITTED, actor, undefined, mockTx),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('SettledState (Financial Invariant & Terminal Locking)', () => {
@@ -171,5 +269,12 @@ describe('ClaimStateMachine (GoF State Pattern Finite State Machine)', () => {
         stateMachine.transition(settledClaim, ClaimStatus.OFFICER_APPROVED, actor, undefined, mockTx),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('should verify canTransitionTo returns false for terminal states', () => {
+      expect(new CancelledState().canTransitionTo(ClaimStatus.SUBMITTED, UserRole.SYSTEM_ADMIN, true)).toBe(false);
+      expect(new OfficerRejectedState().canTransitionTo(ClaimStatus.SUBMITTED, UserRole.SYSTEM_ADMIN, true)).toBe(false);
+      expect(new SettledState().canTransitionTo(ClaimStatus.SUBMITTED, UserRole.SYSTEM_ADMIN, true)).toBe(false);
+    });
   });
 });
+

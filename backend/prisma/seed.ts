@@ -348,6 +348,9 @@ async function main() {
   // 5. Seed Realistic Multi-Department Claims with Itemizations & AST Logs (Singapore Context)
   console.log('Seeding realistic multi-department claim trajectories (Singapore Healthcare MOH Framework)...');
 
+  // Clean out any old claims to ensure 100% fresh, consistent Singapore healthcare data
+  await prisma.claim.deleteMany();
+
   const seedClaims = [
     {
       claimNumber: 'CLM-2026-ENG01',

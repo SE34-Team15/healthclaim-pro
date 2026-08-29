@@ -412,5 +412,193 @@ describe('ClaimsService (TDD)', () => {
       expect(result.attachments).toHaveLength(1);
       expect(result.attachments[0].id).toBe('att-1');
     });
+
+    it('should throw BadRequestException on invalid invoice date format', async () => {
+      await expect(
+        service.submitClaim('user-123', {
+          category: ClaimCategory.CONSULTATION,
+          invoiceDate: 'invalid-date-string',
+          hospitalName: 'Hospital',
+          items: [],
+        }),
+      ).rejects.toThrow('Invalid invoice date format.');
+    });
+  });
+
+  describe('transitionStatus', () => {
+    it('should throw NotFoundException if claim does not exist', async () => {
+      prismaMock.claim.findUnique.mockResolvedValue(null);
+      await expect(
+        service.transitionStatus(
+          'non-existent',
+          ClaimStatus.OFFICER_APPROVED,
+          { id: 'officer-1', role: UserRole.CLAIM_OFFICER },
+        ),
+      ).rejects.toThrow('not found');
+    });
+
+    it('should transition status and record audit log', async () => {
+      const existingClaim = {
+        id: 'claim-123',
+        status: ClaimStatus.SUBMITTED,
+        userId: 'user-123',
+        fiscalYear: 2026,
+      };
+      prismaMock.claim.findUnique.mockResolvedValue(existingClaim);
+
+      const result = await service.transitionStatus(
+        'claim-123',
+        ClaimStatus.OFFICER_APPROVED,
+        { id: 'officer-1', role: UserRole.CLAIM_OFFICER },
+        'Approved by officer',
+        '127.0.0.1',
+      );
+
+      expect(result.status).toBe(ClaimStatus.OFFICER_APPROVED);
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'TRANSITION_CLAIM_STATUS',
+          targetResourceId: 'claim-123',
+        }),
+      );
+    });
+  });
+
+  describe('getMyClaims', () => {
+    it('should retrieve claims belonging to the user', async () => {
+      prismaMock.claim.findMany.mockResolvedValue([
+        {
+          id: 'claim-123',
+          claimNumber: 'CLM-2026-ABCDEF',
+          userId: 'user-123',
+          fiscalYear: 2026,
+          category: ClaimCategory.CONSULTATION,
+          hospitalName: 'Hospital',
+          totalAmount: 100,
+          approvedAmount: 80,
+          deductibleCovered: 20,
+          coPayRate: 0.8,
+          outOfPocketAmount: 20,
+          status: ClaimStatus.SUBMITTED,
+          items: [],
+          ruleEvaluations: [],
+          attachments: [],
+          user: mockUser,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          invoiceDate: new Date(),
+        },
+      ]);
+
+      const myClaims = await service.getMyClaims('user-123');
+      expect(myClaims).toHaveLength(1);
+      expect(myClaims[0].id).toBe('claim-123');
+      expect(prismaMock.claim.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-123' },
+        }),
+      );
+    });
+  });
+
+  describe('getAllClaims', () => {
+    it('should filter by single status or multiple statuses and search term', async () => {
+      prismaMock.claim.findMany.mockResolvedValue([]);
+
+      await service.getAllClaims('SUBMITTED', 'Singapore');
+      expect(prismaMock.claim.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'SUBMITTED',
+            OR: expect.any(Array),
+          }),
+        }),
+      );
+
+      await service.getAllClaims('SUBMITTED,AUTO_VALIDATED', undefined);
+      expect(prismaMock.claim.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: { in: ['SUBMITTED', 'AUTO_VALIDATED'] },
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('getClaimById', () => {
+    it('should throw NotFoundException if claim not found', async () => {
+      prismaMock.claim.findUnique.mockResolvedValue(null);
+      await expect(
+        service.getClaimById('missing-claim', { id: 'user-1', role: UserRole.EMPLOYEE }),
+      ).rejects.toThrow('not found');
+    });
+
+    it('should throw ForbiddenException if employee views another user claim', async () => {
+      prismaMock.claim.findUnique.mockResolvedValue({
+        id: 'claim-123',
+        userId: 'user-other',
+      });
+
+      await expect(
+        service.getClaimById('claim-123', { id: 'user-1', role: UserRole.EMPLOYEE }),
+      ).rejects.toThrow('You do not have permission to view this claim voucher.');
+    });
+
+    it('should return claim if employee views their own claim or if reviewer views claim', async () => {
+      const claim = {
+        id: 'claim-123',
+        claimNumber: 'CLM-2026-ABCDEF',
+        userId: 'user-1',
+        fiscalYear: 2026,
+        category: ClaimCategory.CONSULTATION,
+        hospitalName: 'Hospital',
+        totalAmount: 100,
+        approvedAmount: 80,
+        deductibleCovered: 20,
+        coPayRate: 0.8,
+        outOfPocketAmount: 20,
+        status: ClaimStatus.SUBMITTED,
+        items: [],
+        ruleEvaluations: [],
+        attachments: [],
+        user: mockUser,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        invoiceDate: new Date(),
+      };
+      prismaMock.claim.findUnique.mockResolvedValue(claim);
+
+      const res = await service.getClaimById('claim-123', { id: 'user-1', role: UserRole.EMPLOYEE });
+      expect(res.id).toBe('claim-123');
+
+      const officerRes = await service.getClaimById('claim-123', { id: 'officer-1', role: UserRole.CLAIM_OFFICER });
+      expect(officerRes.id).toBe('claim-123');
+    });
+  });
+
+  describe('forcePurgeClaim', () => {
+    it('should throw NotFoundException if claim is missing', async () => {
+      prismaMock.claim.findUnique.mockResolvedValue(null);
+      await expect(service.forcePurgeClaim('missing-claim', 'admin-1')).rejects.toThrow('not found');
+    });
+
+    it('should delete storage attachments and cascade delete DB claim', async () => {
+      prismaMock.claim.findUnique.mockResolvedValue({
+        id: 'claim-123',
+        attachments: [{ storageKey: 'key1.enc' }, { storageKey: 'key2.enc' }],
+      });
+      prismaMock.claim.delete = vi.fn().mockResolvedValue({});
+
+      const result = await service.forcePurgeClaim('claim-123', 'admin-1', '127.0.0.1');
+      expect(result.success).toBe(true);
+      expect(prismaMock.claim.delete).toHaveBeenCalledWith({ where: { id: 'claim-123' } });
+      expect(auditServiceMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'FORCE_PURGE_CLAIM',
+        }),
+      );
+    });
   });
 });
+
