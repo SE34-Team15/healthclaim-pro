@@ -356,18 +356,20 @@ export class ClaimsService {
     const where: any = {};
 
     if (status && status !== 'ALL') {
-      if (status.includes(',')) {
-        where.status = { in: status.split(',').map((s) => s.trim()) as any };
+      const statusStr = typeof status === 'string' ? status : Array.isArray(status) ? (status as string[]).join(',') : String(status);
+      if (statusStr.includes(',')) {
+        where.status = { in: statusStr.split(',').map((s) => s.trim()) as any };
       } else {
-        where.status = status as any;
+        where.status = statusStr as any;
       }
     }
 
     if (search) {
+      const searchStr = typeof search === 'string' ? search : String(search);
       where.OR = [
-        { claimNumber: { contains: search, mode: 'insensitive' } },
-        { hospitalName: { contains: search, mode: 'insensitive' } },
-        { user: { email: { contains: search, mode: 'insensitive' } } },
+        { claimNumber: { contains: searchStr, mode: 'insensitive' } },
+        { hospitalName: { contains: searchStr, mode: 'insensitive' } },
+        { user: { email: { contains: searchStr, mode: 'insensitive' } } },
       ];
     }
 

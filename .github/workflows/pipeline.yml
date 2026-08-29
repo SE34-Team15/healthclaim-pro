@@ -219,14 +219,14 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: '/language:javascript-typescript'
-          output: '../results'
+          output: 'results'
 
       - name: Upload CodeQL SARIF Report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: codeql-sast-report
-          path: ../results/*.sarif
+          path: results/*.sarif
           retention-days: 14
 
   # ============================================================================
