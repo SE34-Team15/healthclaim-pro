@@ -21,10 +21,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -46,8 +46,10 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma Client
-        run: pnpm --filter backend prisma:generate
+      - name: Generate Prisma Client & Compile Shared Types
+        run: |
+          pnpm --filter backend prisma:generate
+          pnpm --filter @healthclaim/shared build
 
       - name: Workspace Lint & TypeCheck
         run: pnpm lint
@@ -66,10 +68,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -87,8 +89,10 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma Client
-        run: pnpm --filter backend prisma:generate
+      - name: Generate Prisma Client & Compile Shared
+        run: |
+          pnpm --filter backend prisma:generate
+          pnpm --filter @healthclaim/shared build
 
       - name: Run Vitest with Coverage Threshold Gates
         run: pnpm test:cov

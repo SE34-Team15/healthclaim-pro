@@ -63,10 +63,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -79,6 +79,7 @@ jobs:
       - name: Sync Database Schema & Seed Data
         run: |
           pnpm --filter backend prisma:generate
+          pnpm --filter @healthclaim/shared build
           pnpm --filter backend prisma:push
           pnpm --filter backend prisma:seed
 
@@ -140,10 +141,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -154,6 +155,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm --filter backend prisma:generate
+          pnpm --filter @healthclaim/shared build
           pnpm --filter backend prisma:push
           pnpm --filter backend prisma:seed
           pnpm build
@@ -166,7 +168,7 @@ jobs:
       - name: OWASP ZAP Baseline Dynamic Penetration Scan
         uses: zaproxy/action-baseline@v0.14.0
         with:
-          target: 'http://localhost:4000/api/v1/departments'
+          target: 'http://localhost:4000/api/v1/health'
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a'
           allow_issue_writing: false

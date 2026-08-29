@@ -18,7 +18,8 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@healthclaim/shared": ["../shared/src/index.ts"]
     }
   },
   "include": ["src"],

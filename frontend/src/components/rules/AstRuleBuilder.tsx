@@ -55,7 +55,7 @@ export function astToExpression(node: AstNode): string {
     }
 
     const val = Array.isArray(node.value)
-      ? `{${node.value.map((v) => `"${v}"`).join(' ')}}`
+      ? `{${node.value.map((v: any) => `"${v}"`).join(' ')}}`
       : typeof node.value === 'string'
       ? `"${node.value}"`
       : `${node.value}`;
@@ -120,11 +120,11 @@ function astToGroups(ast: AstNode): ConditionGroup[] {
 
   if (ast.type === 'LOGICAL') {
     if (ast.operator === LogicalOperator.OR) {
-      return ast.children.map((child, gIdx) => {
+      return ast.children.map((child: AstNode, gIdx: number) => {
         if (child.type === 'LOGICAL' && child.operator === LogicalOperator.AND) {
           return {
             id: `g-${gIdx}-${Date.now()}`,
-            conditions: child.children.map((sub, cIdx) => {
+            conditions: child.children.map((sub: AstNode, cIdx: number) => {
               if (sub.type === 'COMPARISON') {
                 return { id: `c-${cIdx}-${Date.now()}`, field: sub.field, operator: sub.operator, value: sub.value };
               }
@@ -143,7 +143,7 @@ function astToGroups(ast: AstNode): ConditionGroup[] {
       return [
         {
           id: 'g-root',
-          conditions: ast.children.map((child, cIdx) => {
+          conditions: ast.children.map((child: AstNode, cIdx: number) => {
             if (child.type === 'COMPARISON') {
               return { id: `c-${cIdx}`, field: child.field, operator: child.operator, value: child.value };
             }

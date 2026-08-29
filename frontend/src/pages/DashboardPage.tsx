@@ -1343,7 +1343,7 @@ export const DashboardPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {selectedClaim.items.map((it, idx) => (
+                      {selectedClaim.items.map((it: any, idx: number) => (
                         <tr key={idx}>
                           <td className="p-2.5 font-medium">{it.description}</td>
                           <td className="p-2.5 font-mono text-[11px]">{it.category}</td>

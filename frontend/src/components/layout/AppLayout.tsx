@@ -176,7 +176,7 @@ export const AppLayout: React.FC = () => {
 
           <div className="flex items-center gap-3.5">
             {/* Clean Remaining Quota Indicator (Only rendered for Employees with Quota) */}
-            {user?.role === UserRole.EMPLOYEE && user.activeQuota && (
+            {user && user.role === UserRole.EMPLOYEE && user.activeQuota && (
               <>
                 <div className="hidden sm:flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 rounded-xl text-xs shadow-2xs">
                   <span className="text-slate-500 font-medium">Quota:</span>

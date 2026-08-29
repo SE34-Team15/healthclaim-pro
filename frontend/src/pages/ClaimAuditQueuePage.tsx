@@ -807,7 +807,7 @@ export const ClaimAuditQueuePage: React.FC = () => {
                     </span>
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {selectedClaim.attachments.map((att) => (
+                    {selectedClaim.attachments.map((att: ReceiptAttachmentDto) => (
                       <div
                         key={att.id}
                         className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between gap-2"
@@ -862,7 +862,7 @@ export const ClaimAuditQueuePage: React.FC = () => {
                 </h4>
                 <div className="space-y-2">
                   {selectedClaim.ruleEvaluations && selectedClaim.ruleEvaluations.length > 0 ? (
-                    selectedClaim.ruleEvaluations.map((rule, idx) => (
+                    selectedClaim.ruleEvaluations.map((rule: any, idx: number) => (
                       <div
                         key={idx}
                         className={`p-3 rounded-xl border flex items-start justify-between gap-3 ${
@@ -914,7 +914,7 @@ export const ClaimAuditQueuePage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {selectedClaim.items.map((it, idx) => (
+                      {selectedClaim.items.map((it: any, idx: number) => (
                         <tr key={idx}>
                           <td className="p-2.5 font-medium">{it.description}</td>
                           <td className="p-2.5 font-mono text-[11px]">{it.category}</td>

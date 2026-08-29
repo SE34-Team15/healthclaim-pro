@@ -423,7 +423,7 @@ export const MyClaimsPage: React.FC = () => {
                     </span>
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {selectedClaim.attachments.map((att) => (
+                    {selectedClaim.attachments.map((att: any) => (
                       <div
                         key={att.id}
                         className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between gap-2"
@@ -486,7 +486,7 @@ export const MyClaimsPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {selectedClaim.items.map((it, idx) => (
+                      {selectedClaim.items.map((it: any, idx: number) => (
                         <tr key={idx}>
                           <td className="p-2.5 font-medium">{it.description}</td>
                           <td className="p-2.5 font-mono text-[11px]">{it.category}</td>
