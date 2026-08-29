@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.github
+.gemini
+coverage
+test-results
+playwright-report
+blob-report
+*.log
+.env
+.env.*
+!.env.example

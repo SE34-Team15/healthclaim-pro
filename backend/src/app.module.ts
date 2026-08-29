@@ -12,6 +12,7 @@ import { ClaimsModule } from './claims/claims.module';
 import { StorageModule } from './storage/storage.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     StorageModule,
     DepartmentsModule,
     AnalyticsModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
