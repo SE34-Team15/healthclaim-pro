@@ -36,7 +36,8 @@ coverage/
 # Local database & storage
 *.db
 *.sqlite
-uploads/
-storage/
+/uploads/
+backend/uploads/
+/storage/
 minio_data/
 postgres_data/
