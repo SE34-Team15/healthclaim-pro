@@ -80,6 +80,11 @@ describe('AnalyticsService (Unit Tests)', () => {
         { benefitTierId: 't1', _count: { id: 8 }, _sum: { annualLimit: 24000 } },
       ]);
 
+      (prisma.userPolicyQuota.findMany as any).mockResolvedValueOnce([
+        { annualLimit: 3000, remainingBalance: 2000 },
+        { annualLimit: 3000, remainingBalance: 500 },
+      ]);
+
       const result = await service.getAdminOverview();
 
       expect(result.totalMembers).toBe(10);
@@ -94,6 +99,9 @@ describe('AnalyticsService (Unit Tests)', () => {
         { department: 'Engineering / IT', memberCount: 6, claimCount: 2 },
         { department: 'Finance / Treasury', memberCount: 2, claimCount: 1 },
       ]);
+      expect(result.departmentPerCapitaStats.length).toBe(2);
+      expect(result.monthlyThroughput.length).toBe(12);
+      expect(result.quotaUtilizationDistribution.length).toBe(4);
       expect(result.policyTierEnrollment).toEqual([
         { tierName: 'Standard Plan', tierCode: 'TIER_STANDARD', enrolledCount: 8, annualLimit: 3000 },
       ]);
@@ -238,6 +246,7 @@ describe('AnalyticsService (Unit Tests)', () => {
       expect(result.privilegedOpsBreakdown).toEqual([
         { action: 'ADMIN UPDATE USER PROFILE', count: 1 },
       ]);
+      expect(result.securityActivityTrend.length).toBe(7);
     });
   });
 

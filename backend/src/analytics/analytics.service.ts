@@ -23,6 +23,7 @@ export class AnalyticsService {
       userDepartmentCounts,
       claimsWithUsers,
       tierQuotaCounts,
+      allQuotas,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { status: 'ACTIVE' } }),
@@ -52,6 +53,10 @@ export class AnalyticsService {
         where: { fiscalYear: currentYear },
         select: {
           id: true,
+          totalAmount: true,
+          approvedAmount: true,
+          status: true,
+          createdAt: true,
           user: { select: { department: true } },
         },
       }),
@@ -60,6 +65,10 @@ export class AnalyticsService {
         _count: { id: true },
         _sum: { annualLimit: true },
         where: { fiscalYear: currentYear },
+      }),
+      this.prisma.userPolicyQuota.findMany({
+        where: { fiscalYear: currentYear },
+        select: { annualLimit: true, remainingBalance: true },
       }),
     ]);
 
@@ -80,9 +89,23 @@ export class AnalyticsService {
     });
 
     const claimCountMap = new Map<string, number>();
+    const deptSpendingMap = new Map<string, number>();
+
     claimsWithUsers.forEach((c) => {
       const dept = c.user?.department || 'Unassigned';
       claimCountMap.set(dept, (claimCountMap.get(dept) || 0) + 1);
+
+      if (
+        c.status === ClaimStatus.SETTLED ||
+        c.status === ClaimStatus.FINANCE_APPROVED ||
+        c.status === ClaimStatus.OFFICER_APPROVED ||
+        c.status === ClaimStatus.AUTO_VALIDATED
+      ) {
+        deptSpendingMap.set(
+          dept,
+          (deptSpendingMap.get(dept) || 0) + Number(c.approvedAmount || c.totalAmount || 0),
+        );
+      }
     });
 
     const departmentWorkforceAndClaims = allDepartments.map((d) => ({
@@ -90,6 +113,59 @@ export class AnalyticsService {
       memberCount: memberCountMap.get(d.name) || 0,
       claimCount: claimCountMap.get(d.name) || 0,
     }));
+
+    // 1. Department Per-Capita Medical Spending & Claim Intensity
+    const departmentPerCapitaStats = allDepartments
+      .map((d) => {
+        const members = memberCountMap.get(d.name) || 0;
+        const totalSpent = deptSpendingMap.get(d.name) || 0;
+        const perCapita = members > 0 ? Math.round(totalSpent / members) : 0;
+        return {
+          department: d.name.replace(' & ', ' / '),
+          perCapitaSpent: perCapita,
+          totalSpent: Math.round(totalSpent),
+          members,
+        };
+      })
+      .sort((a, b) => b.perCapitaSpent - a.perCapitaSpent);
+
+    // 2. Enterprise Claims Monthly Ingest & Settlement Throughput Velocity
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlyThroughput = monthNames.map((name) => ({
+      month: name,
+      submitted: 0,
+      settled: 0,
+      totalBilled: 0,
+    }));
+
+    claimsWithUsers.forEach((c) => {
+      const m = new Date(c.createdAt).getMonth();
+      if (m >= 0 && m < 12) {
+        monthlyThroughput[m].submitted += 1;
+        monthlyThroughput[m].totalBilled += Number(c.totalAmount || 0);
+        if (c.status === ClaimStatus.SETTLED) {
+          monthlyThroughput[m].settled += 1;
+        }
+      }
+    });
+
+    // 3. Organization-Wide Quota Utilization Distribution
+    const quotaUtilizationDistribution = [
+      { name: '0 - 25% Used', value: 0 },
+      { name: '25% - 50% Used', value: 0 },
+      { name: '50% - 75% Used', value: 0 },
+      { name: '75% - 100% Used', value: 0 },
+    ];
+
+    allQuotas.forEach((q) => {
+      const limit = Number(q.annualLimit) || 1;
+      const remaining = Number(q.remainingBalance) || 0;
+      const usedPercent = Math.max(0, Math.min(100, ((limit - remaining) / limit) * 100));
+      if (usedPercent <= 25) quotaUtilizationDistribution[0].value += 1;
+      else if (usedPercent <= 50) quotaUtilizationDistribution[1].value += 1;
+      else if (usedPercent <= 75) quotaUtilizationDistribution[2].value += 1;
+      else quotaUtilizationDistribution[3].value += 1;
+    });
 
     // Map policy tier enrollment
     const tierEnrollmentMap = new Map<string, number>();
@@ -114,6 +190,9 @@ export class AnalyticsService {
       approvedClaimsCount,
       globalApprovalRate,
       departmentWorkforceAndClaims,
+      departmentPerCapitaStats,
+      monthlyThroughput,
+      quotaUtilizationDistribution,
       policyTierEnrollment,
     };
   }
@@ -446,12 +525,37 @@ export class AnalyticsService {
       count,
     }));
 
+    // 7-day activity velocity & privileged mutation timeline
+    const dailyTrendMap = new Map<string, { date: string; totalEvents: number; privilegedEvents: number }>();
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateKey = d.toISOString().split('T')[0];
+      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      dailyTrendMap.set(dateKey, { date: label, totalEvents: 0, privilegedEvents: 0 });
+    }
+
+    logs.forEach((l) => {
+      const dateKey = new Date(l.createdAt).toISOString().split('T')[0];
+      if (dailyTrendMap.has(dateKey)) {
+        const item = dailyTrendMap.get(dateKey)!;
+        item.totalEvents += 1;
+        if (privilegedActions.some((pa) => l.action.includes(pa))) {
+          item.privilegedEvents += 1;
+        }
+      }
+    });
+
+    const securityActivityTrend = Array.from(dailyTrendMap.values());
+
     return {
       totalLogsCount,
       privilegedOperationsCount: privilegedLogs.length,
       complianceScore: 100, // 100% compliant: AES-256 enabled, audit logs active, RBAC active
       eventsByResource,
       privilegedOpsBreakdown,
+      securityActivityTrend,
       recentLogs: logs.slice(0, 10).map((l) => ({
         id: l.id,
         action: l.action,

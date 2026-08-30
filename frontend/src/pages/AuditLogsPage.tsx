@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import { BRAND_CONFIG } from '../config/branding';
 import { Button } from '../components/ui/button';
 import {
   Select,
@@ -8,6 +10,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '../components/ui/dropdown-menu';
 import {
   Table,
   TableHeader,
@@ -23,16 +33,19 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   Shield,
   Filter,
   FileSpreadsheet,
-  Printer,
+  FileText,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Code2,
-  Calendar,
-  Layers,
+  Columns,
+  Rows,
 } from 'lucide-react';
 
 interface AuditRecord {
@@ -61,10 +74,12 @@ interface AuditApiResponse {
 }
 
 export const AuditLogsPage: React.FC = () => {
+  const { user } = useAuth();
   const [logs, setLogs] = useState<AuditRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState('ALL');
   const [exporting, setExporting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -147,8 +162,122 @@ export const AuditLogsPage: React.FC = () => {
     }
   };
 
-  const handlePrintReport = () => {
-    window.print();
+  const handleExportPdf = async (orientation: 'landscape' | 'portrait' = 'landscape') => {
+    setExportingPdf(true);
+    try {
+      // 1. Fetch current filtered dataset (up to 200 records)
+      const params = new URLSearchParams();
+      if (actionFilter && actionFilter !== 'ALL') params.append('action', actionFilter);
+      params.append('page', '1');
+      params.append('pageSize', '200');
+
+      const data = await apiClient.get<any, AuditApiResponse>(
+        `/audit/logs?${params.toString()}`,
+      );
+      const exportLogs = data.items && data.items.length > 0 ? data.items : logs;
+
+      const isLandscape = orientation === 'landscape';
+
+      // 2. Initialize jsPDF Document
+      const doc = new jsPDF({
+        orientation,
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const exportTimestamp = new Date().toLocaleString();
+      const exporterName = user ? `${user.firstName} ${user.lastName} (${user.email})` : 'Authorized User';
+      const filterLabel = actionFilter === 'ALL' ? 'All Audit Actions' : actionFilter;
+
+      const pageWidth = isLandscape ? 297 : 210;
+      const pageHeight = isLandscape ? 210 : 297;
+      const marginSide = isLandscape ? 12 : 10;
+      const rightEdge = pageWidth - marginSide;
+
+      // 3. Render High-Fidelity Vector AutoTable
+      autoTable(doc, {
+        head: [['Timestamp', 'Event Action', 'Actor Identity', 'Resource', 'Payload Details Snapshot', 'Origin IP']],
+        body: exportLogs.map((log) => [
+          new Date(log.createdAt).toLocaleString(),
+          log.action,
+          log.actor ? `${log.actor.firstName} ${log.actor.lastName}\n${log.actor.email}` : 'System Kernel',
+          log.targetResource,
+          log.details ? (typeof log.details === 'object' ? JSON.stringify(log.details) : String(log.details)) : '—',
+          log.ipAddress || '127.0.0.1',
+        ]),
+        startY: 30,
+        margin: { top: 30, right: marginSide, bottom: 16, left: marginSide },
+        styles: {
+          fontSize: isLandscape ? 8 : 7.2,
+          cellPadding: isLandscape ? 2.5 : 2,
+          valign: 'middle',
+          overflow: 'linebreak',
+          textColor: [30, 41, 59],
+        },
+        headStyles: {
+          fillColor: [10, 37, 64], // #0a2540 brand navy
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: isLandscape ? 8.5 : 7.5,
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: isLandscape
+          ? {
+              0: { cellWidth: 38 }, // Timestamp
+              1: { cellWidth: 44, fontStyle: 'bold' }, // Event Action
+              2: { cellWidth: 46 }, // Actor Identity
+              3: { cellWidth: 26 }, // Resource
+              4: { cellWidth: 'auto' }, // Payload Details (auto wraps)
+              5: { cellWidth: 26, halign: 'right' }, // Origin IP
+            }
+          : {
+              0: { cellWidth: 26 }, // Timestamp
+              1: { cellWidth: 32, fontStyle: 'bold' }, // Event Action
+              2: { cellWidth: 36 }, // Actor Identity
+              3: { cellWidth: 20 }, // Resource
+              4: { cellWidth: 'auto' }, // Payload Details (auto wraps)
+              5: { cellWidth: 22, halign: 'right' }, // Origin IP
+            },
+        didDrawPage: (pageData) => {
+          // Top Header on Every Page
+          doc.setFontSize(isLandscape ? 13 : 11);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(10, 37, 64);
+          doc.text('HealthClaim Pro — Audit & Compliance Log Report', marginSide, 12);
+
+          doc.setFontSize(isLandscape ? 8 : 7);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(100, 116, 139);
+          doc.text(
+            `Generated: ${exportTimestamp}   |   Exported By: ${exporterName}   |   Filter: ${filterLabel}   |   Records: ${exportLogs.length}   |   Layout: ${orientation.toUpperCase()}`,
+            marginSide,
+            18,
+          );
+
+          doc.setDrawColor(226, 232, 240);
+          doc.setLineWidth(0.4);
+          doc.line(marginSide, 22, rightEdge, 22);
+
+          // Bottom Footer on Every Page
+          const pageCount = (doc as any).internal.getNumberOfPages();
+          doc.setFontSize(isLandscape ? 8 : 7);
+          doc.setTextColor(148, 163, 184);
+          doc.text(`Page ${pageData.pageNumber} of ${pageCount}`, rightEdge, pageHeight - 8, { align: 'right' });
+          doc.text('HealthClaim Pro Enterprise • System Audit Trail Log Export', marginSide, pageHeight - 8);
+        },
+      });
+
+      // 4. Instant Vector PDF Download
+      const fileName = `healthclaim_audit_${orientation}_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      toast.success(`Vector audit report PDF (${orientation}) exported: ${fileName}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to export PDF');
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   const startIndex = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -157,7 +286,7 @@ export const AuditLogsPage: React.FC = () => {
   return (
     <div className="h-[calc(100vh-7.5rem)] flex flex-col min-h-0 space-y-3.5 text-slate-900">
       {/* Header with Export Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 print:hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-[#0a2540] flex items-center gap-2">
             <Shield className="h-5 w-5 text-slate-700" />
@@ -180,26 +309,52 @@ export const AuditLogsPage: React.FC = () => {
             <span>{exporting ? 'Exporting...' : 'Export CSV'}</span>
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePrintReport}
-            className="gap-2 text-xs font-semibold h-8 bg-white"
-          >
-            <Printer className="h-4 w-4 text-slate-600" />
-            <span>Print / PDF</span>
-          </Button>
+          {/* Export PDF with Orientation Dropdown Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={exportingPdf}
+                className="gap-1.5 text-xs font-semibold h-8 bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50/50"
+              >
+                <FileText className="h-4 w-4 text-indigo-600" />
+                <span>{exportingPdf ? 'Exporting...' : 'Export PDF'}</span>
+                <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 p-1 shadow-lg">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-slate-400 font-mono">
+                Select PDF Orientation
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleExportPdf('landscape')}
+                className="gap-2.5 py-2 cursor-pointer"
+              >
+                <Columns className="h-4 w-4 text-indigo-600 shrink-0" />
+                <div>
+                  <p className="font-semibold text-slate-900 text-xs">Landscape (A4)</p>
+                  <p className="text-[10px] text-slate-400">Wide view • Best for multi-column tables</p>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleExportPdf('portrait')}
+                className="gap-2.5 py-2 cursor-pointer"
+              >
+                <Rows className="h-4 w-4 text-slate-600 shrink-0" />
+                <div>
+                  <p className="font-semibold text-slate-900 text-xs">Portrait (A4)</p>
+                  <p className="text-[10px] text-slate-400">Standard document binder format</p>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* Printable Report Header */}
-      <div className="hidden print:block mb-6 border-b pb-4">
-        <h1 className="text-2xl font-bold text-slate-950">HealthClaim Pro - Compliance Audit Report</h1>
-        <p className="text-xs text-slate-500 mt-1">Generated: {new Date().toLocaleString()} • Filter: {actionFilter}</p>
-      </div>
-
       {/* Filter Bar */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between shrink-0 print:hidden">
+      <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <Filter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
           <span className="text-xs text-slate-600 font-semibold whitespace-nowrap">Filter Action:</span>
@@ -239,15 +394,27 @@ export const AuditLogsPage: React.FC = () => {
       <div className="flex-1 min-h-0 flex flex-col bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Scrollable Table Body Area */}
         <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 relative">
-          <Table>
+          <Table className="w-full table-fixed text-xs">
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-44">Timestamp</TableHead>
-                <TableHead className="w-48">Event Action</TableHead>
-                <TableHead className="w-52">Actor</TableHead>
-                <TableHead className="w-40">Target Resource</TableHead>
-                <TableHead className="min-w-[200px]">Payload Snapshot</TableHead>
-                <TableHead className="w-32 text-right">IP Origin</TableHead>
+              <TableRow className="border-b border-slate-200 bg-slate-50/75">
+                <TableHead className="w-[17%] text-slate-700 font-bold text-[11px] uppercase">
+                  Timestamp
+                </TableHead>
+                <TableHead className="w-[18%] text-slate-700 font-bold text-[11px] uppercase">
+                  Event Action
+                </TableHead>
+                <TableHead className="w-[20%] text-slate-700 font-bold text-[11px] uppercase">
+                  Actor Identity
+                </TableHead>
+                <TableHead className="w-[13%] text-slate-700 font-bold text-[11px] uppercase">
+                  Resource
+                </TableHead>
+                <TableHead className="w-[22%] text-slate-700 font-bold text-[11px] uppercase">
+                  Payload Details
+                </TableHead>
+                <TableHead className="w-[10%] text-right text-slate-700 font-bold text-[11px] uppercase">
+                  Origin IP
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -268,35 +435,45 @@ export const AuditLogsPage: React.FC = () => {
                   <TableRow
                     key={log.id}
                     onClick={() => setSelectedRecord(log)}
-                    className="cursor-pointer hover:bg-slate-50/80 transition-colors"
+                    className="cursor-pointer hover:bg-slate-50/80 transition-colors border-b border-slate-100"
                   >
-                    <TableCell className="text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                    <TableCell className="text-slate-500 font-mono text-[11px] whitespace-nowrap py-2.5">
                       {new Date(log.createdAt).toLocaleString()}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-2.5">
                       <span className="px-2 py-0.5 rounded-md border border-slate-200 bg-slate-50 font-mono font-bold text-slate-800 text-[11px]">
                         {log.action}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-2.5 truncate">
                       {log.actor ? (
                         <div>
-                          <p className="font-semibold text-slate-900 text-xs">
+                          <p className="font-semibold text-slate-900 text-xs truncate">
                             {log.actor.firstName} {log.actor.lastName}
                           </p>
-                          <p className="text-[10px] text-slate-400 font-mono">{log.actor.email}</p>
+                          <p className="text-[10px] text-slate-400 font-mono truncate">{log.actor.email}</p>
                         </div>
                       ) : (
-                        <span className="text-slate-400 text-xs font-sans">System Kernel</span>
+                        <span className="text-slate-400 text-xs font-sans">
+                          System Kernel
+                        </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-slate-700 font-semibold text-xs">
+                    <TableCell className="text-slate-700 font-semibold text-xs py-2.5 truncate">
                       {log.targetResource}
                     </TableCell>
-                    <TableCell className="text-slate-600 font-mono text-[11px] max-w-md truncate">
-                      {log.details ? JSON.stringify(log.details) : '—'}
+                    <TableCell className="text-slate-600 font-mono text-[11px] truncate py-2.5">
+                      {log.details ? (
+                        typeof log.details === 'object' ? (
+                          <span className="text-slate-700">{JSON.stringify(log.details)}</span>
+                        ) : (
+                          String(log.details)
+                        )
+                      ) : (
+                        '—'
+                      )}
                     </TableCell>
-                    <TableCell className="text-slate-400 font-mono text-[11px] text-right">
+                    <TableCell className="text-slate-500 font-mono text-[11px] text-right py-2.5">
                       {log.ipAddress || '127.0.0.1'}
                     </TableCell>
                   </TableRow>
@@ -358,7 +535,7 @@ export const AuditLogsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Record Payload Inspection Modal */}
+      {/* Record Payload Inspection Modal (Screen Mode Only) */}
       <Dialog open={!!selectedRecord} onOpenChange={(open) => !open && setSelectedRecord(null)}>
         <DialogContent className="max-w-xl">
           <DialogHeader className="pr-6">
@@ -412,3 +589,4 @@ export const AuditLogsPage: React.FC = () => {
     </div>
   );
 };
+

@@ -55,6 +55,7 @@ import {
   KeyRound,
   ShieldAlert,
   FolderTree,
+  LayoutDashboard,
 } from 'lucide-react';
 
 const CHART_PALETTE = [
@@ -260,7 +261,7 @@ export const DashboardPage: React.FC = () => {
         <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <LayoutDashboard className="h-3.5 w-3.5 text-slate-400" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                 Employee Health Actuarial Hub
               </span>
@@ -272,17 +273,6 @@ export const DashboardPage: React.FC = () => {
               Active Tier: <span className="font-semibold text-slate-800">{tierName}</span> • Department:{' '}
               <span className="font-semibold text-slate-800">{user?.department || 'Engineering & IT'}</span>
             </p>
-          </div>
-          <div className="flex items-center gap-4 text-xs bg-slate-50 border border-slate-200/60 p-3 rounded-xl">
-            <div>
-              <p className="text-slate-400 font-medium text-[10px] uppercase">Fiscal Period</p>
-              <p className="font-bold text-[#0a2540] font-mono">{currentYear} YTD</p>
-            </div>
-            <div className="h-8 w-px bg-slate-200" />
-            <div>
-              <p className="text-slate-400 font-medium text-[10px] uppercase">Co-Pay Coverage</p>
-              <p className="font-bold text-[#00a88f] font-mono">{(defaultCoPayRate * 100).toFixed(0)}%</p>
-            </div>
           </div>
         </div>
 
@@ -542,7 +532,7 @@ export const DashboardPage: React.FC = () => {
         <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#00a88f] animate-pulse" />
+              <LayoutDashboard className="h-3.5 w-3.5 text-slate-400" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                 Underwriting & AST Engine Telemetry
               </span>
@@ -553,13 +543,6 @@ export const DashboardPage: React.FC = () => {
             <p className="text-xs text-slate-500 mt-0.5">
               Live AST compliance rule telemetry, Straight-Through Processing (STP) rate, and fraud triage.
             </p>
-          </div>
-          <div className="flex items-center gap-3 text-xs bg-teal-50/60 border border-teal-200/60 p-3 rounded-xl">
-            <Zap className="h-5 w-5 text-[#00a88f]" />
-            <div>
-              <p className="text-teal-800 font-bold font-mono">AST Engine v2.4 Active</p>
-              <p className="text-teal-600 text-[11px]">Composite Specification Active</p>
-            </div>
           </div>
         </div>
 
@@ -573,7 +556,7 @@ export const DashboardPage: React.FC = () => {
               {stpRate}
               <span className="text-lg font-bold font-sans ml-1 text-[#00a88f]/80">%</span>
             </p>
-            <p className="text-xs text-slate-500 mt-3">Straight-through validation with 0 human intervention</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Automated straight-through pass rate</p>
           </div>
 
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
@@ -582,7 +565,7 @@ export const DashboardPage: React.FC = () => {
               <Clock className="h-4 w-4 text-amber-500" />
             </div>
             <p className="text-2xl font-black text-amber-600 font-mono tracking-tight">{flaggedCount}</p>
-            <p className="text-xs text-slate-500 mt-3 font-medium">Flagged rule violations requiring officer signoff</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Claims awaiting officer review</p>
           </div>
 
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
@@ -591,7 +574,7 @@ export const DashboardPage: React.FC = () => {
               <FileCheck2 className="h-4 w-4 text-indigo-600" />
             </div>
             <p className="text-2xl font-black text-indigo-600 font-mono tracking-tight">{officerApprovedCount}</p>
-            <p className="text-xs text-slate-500 mt-3 font-medium">Forwarded to Finance for final settlement</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Forwarded to Finance settlement</p>
           </div>
 
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
@@ -600,9 +583,7 @@ export const DashboardPage: React.FC = () => {
               <Activity className="h-4 w-4 text-slate-700" />
             </div>
             <p className="text-2xl font-black text-slate-900 font-mono tracking-tight">{avgTriageLatencyHours} hrs</p>
-            <p className="text-xs text-emerald-600 mt-3 font-medium flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Well within 24h SLA ceiling
-            </p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Average claim review turnaround</p>
           </div>
         </div>
 
@@ -773,7 +754,7 @@ export const DashboardPage: React.FC = () => {
         <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <LayoutDashboard className="h-3.5 w-3.5 text-slate-400" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                 Corporate Treasury & Benefit Solvency
               </span>
@@ -784,17 +765,6 @@ export const DashboardPage: React.FC = () => {
             <p className="text-xs text-slate-500 mt-0.5">
               Multi-department expense allocation, cashflow disbursement SLA, and benefit reserve solvency.
             </p>
-          </div>
-          <div className="flex items-center gap-4 text-xs bg-slate-50 border border-slate-200/60 p-3 rounded-xl">
-            <div>
-              <p className="text-slate-400 font-medium text-[10px] uppercase">Benefit Pool Solvency</p>
-              <p className="font-bold text-[#00a88f] font-mono">{solvencyRate}% Solvency</p>
-            </div>
-            <div className="h-8 w-px bg-slate-200" />
-            <div>
-              <p className="text-slate-400 font-medium text-[10px] uppercase">Corporate Reserve</p>
-              <p className="font-bold text-[#0a2540] font-mono">${totalCorporatePool.toLocaleString()}</p>
-            </div>
           </div>
         </div>
 
@@ -841,7 +811,7 @@ export const DashboardPage: React.FC = () => {
             <p className="text-2xl font-black text-[#0a2540] font-mono tracking-tight">
               {departmentSpending.length}
             </p>
-            <p className="text-xs text-slate-500 mt-3 font-medium">100% Dynamic corporate entities</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Cost center departments</p>
           </div>
         </div>
 
@@ -1008,6 +978,9 @@ export const DashboardPage: React.FC = () => {
       approvedClaimsCount,
       globalApprovalRate,
       departmentWorkforceAndClaims,
+      departmentPerCapitaStats,
+      monthlyThroughput,
+      quotaUtilizationDistribution,
       policyTierEnrollment,
     } = adminData;
 
@@ -1017,7 +990,7 @@ export const DashboardPage: React.FC = () => {
         <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <LayoutDashboard className="h-3.5 w-3.5 text-slate-400" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                 Organization & Policy Governance Hub
               </span>
@@ -1028,13 +1001,6 @@ export const DashboardPage: React.FC = () => {
             <p className="text-xs text-slate-500 mt-0.5">
               Workforce distribution, corporate department density, policy tier commitments, and global claim throughput.
             </p>
-          </div>
-          <div className="flex items-center gap-3 text-xs bg-slate-50 border border-slate-200/60 p-3 rounded-xl">
-            <Users className="h-5 w-5 text-[#0a2540]" />
-            <div>
-              <p className="text-[#0a2540] font-bold font-mono">Headcount Health: {activeRate}% Active</p>
-              <p className="text-slate-500 text-[11px]">{activeMembers} Active / {totalMembers} Total</p>
-            </div>
           </div>
         </div>
 
@@ -1047,7 +1013,7 @@ export const DashboardPage: React.FC = () => {
             </div>
             <p className="text-2xl font-black text-[#0a2540] font-mono tracking-tight">{totalMembers}</p>
             <p className="text-xs text-slate-500 mt-3 font-medium">
-              <span className="text-emerald-600 font-semibold">{activeMembers} Active</span> • 100% RBAC segregated
+              <span className="text-emerald-600 font-semibold">{activeMembers} Active</span> ({totalMembers - activeMembers} Inactive)
             </p>
           </div>
 
@@ -1057,7 +1023,7 @@ export const DashboardPage: React.FC = () => {
               <Building2 className="h-4 w-4 text-[#00a88f]" />
             </div>
             <p className="text-2xl font-black text-[#00a88f] font-mono tracking-tight">{totalDepartments}</p>
-            <p className="text-xs text-slate-500 mt-3 font-medium">100% Dynamic corporate entities</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Organizational department units</p>
           </div>
 
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
@@ -1086,9 +1052,70 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Visual Charts */}
+        {/* 4 High-Value Enterprise Visual Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Chart 1: Workforce & Claim Activity across Dynamic Departments */}
+          {/* Chart 1: Enterprise Claims Ingest & Settlement Throughput Velocity */}
+          <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-[#0a2540] flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-indigo-600" /> Enterprise Claims Throughput & Settlement Velocity
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Annual submitted vs settled claim velocity across organization</p>
+              </div>
+            </div>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyThroughput} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="adminSubmittedGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0a2540" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#0a2540" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="adminSettledGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#00a88f" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#00a88f" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 10, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '6px' }} />
+                  <Area
+                    type="monotone"
+                    dataKey="submitted"
+                    name="Submitted Claims"
+                    stroke="#0a2540"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#adminSubmittedGradient)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="settled"
+                    name="Settled Claims"
+                    stroke="#00a88f"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#adminSettledGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Chart 2: Workforce & Claim Activity across Dynamic Departments */}
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -1118,7 +1145,7 @@ export const DashboardPage: React.FC = () => {
                     interval={0}
                     axisLine={false}
                     tickLine={false}
-                    tick={({ x, y, payload }) => (
+                    tick={({ y, payload }) => (
                       <text
                         x={0}
                         y={y}
@@ -1141,30 +1168,90 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Chart 2: Policy Tier Enrollment Breakdown */}
+          {/* Chart 3: Department Per-Capita Medical Spending Intensity */}
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-[#0a2540] flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-indigo-600" /> Benefit Policy Tier Enrollment
+                  <TrendingUp className="h-4 w-4 text-emerald-600" /> Department Per-Capita Medical Spending Intensity
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Enrolled member count per active benefit policy tier</p>
+                <p className="text-xs text-slate-400 mt-0.5">Average medical expenditure per enrolled employee by department</p>
+              </div>
+            </div>
+            <div className="h-72">
+              {departmentPerCapitaStats && departmentPerCapitaStats.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    layout="vertical"
+                    data={departmentPerCapitaStats}
+                    margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      allowDecimals={false}
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tickFormatter={(v) => `$${v}`}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="department"
+                      width={130}
+                      interval={0}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={({ y, payload }) => (
+                        <text
+                          x={0}
+                          y={y}
+                          dy={3.5}
+                          textAnchor="start"
+                          fill="#475569"
+                          fontSize={10.5}
+                          fontWeight={500}
+                        >
+                          {payload.value}
+                        </text>
+                      )}
+                    />
+                    <Tooltip content={<CustomChartTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '4px' }} />
+                    <Bar dataKey="perCapitaSpent" name="Per-Capita Spent ($)" fill="#00a88f" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="totalSpent" name="Total Dept Spent ($)" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  No department spending records available.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Chart 4: Organization-Wide Quota Utilization Distribution */}
+          <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-[#0a2540] flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-indigo-600" /> Organization Quota Utilization Brackets
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Distribution of employee quota burn rates across organization</p>
               </div>
             </div>
             <div className="h-72 flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={policyTierEnrollment}
+                    data={quotaUtilizationDistribution || []}
                     cx="50%"
                     cy="50%"
                     innerRadius={55}
                     outerRadius={85}
                     paddingAngle={4}
-                    dataKey="enrolledCount"
-                    nameKey="tierName"
+                    dataKey="value"
+                    nameKey="name"
                   >
-                    {policyTierEnrollment.map((_: any, index: number) => (
+                    {(quotaUtilizationDistribution || []).map((_: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={CHART_PALETTE[index % CHART_PALETTE.length]} />
                     ))}
                   </Pie>
@@ -1229,6 +1316,7 @@ export const DashboardPage: React.FC = () => {
       complianceScore,
       eventsByResource,
       privilegedOpsBreakdown,
+      securityActivityTrend,
       recentLogs,
     } = securityData;
 
@@ -1238,7 +1326,7 @@ export const DashboardPage: React.FC = () => {
         <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <LayoutDashboard className="h-3.5 w-3.5 text-slate-400" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                 Security Governance & Compliance Sentinel
               </span>
@@ -1247,15 +1335,8 @@ export const DashboardPage: React.FC = () => {
               Security Auditor Governance Console
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              SOC2 Type II / HIPAA compliance posture, immutable audit stream, and privileged operation tracking.
+              Compliance posture telemetry, immutable audit stream, and privileged operation tracking.
             </p>
-          </div>
-          <div className="flex items-center gap-3 text-xs bg-emerald-50 border border-emerald-200/60 p-3 rounded-xl">
-            <ShieldCheck className="h-5 w-5 text-emerald-600" />
-            <div>
-              <p className="text-emerald-800 font-bold font-mono">Posture Score: {complianceScore} / 100</p>
-              <p className="text-emerald-600 text-[11px]">SOC2 Type II / HIPAA Compliant</p>
-            </div>
           </div>
         </div>
 
@@ -1270,7 +1351,7 @@ export const DashboardPage: React.FC = () => {
               {complianceScore}
               <span className="text-lg font-bold font-sans ml-1 text-emerald-600/80">%</span>
             </p>
-            <p className="text-xs text-slate-500 mt-3 font-medium">All cryptographic & access controls passed</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Telemetry compliance score</p>
           </div>
 
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
@@ -1279,7 +1360,7 @@ export const DashboardPage: React.FC = () => {
               <Shield className="h-4 w-4 text-[#0a2540]" />
             </div>
             <p className="text-2xl font-black text-[#0a2540] font-mono tracking-tight">{totalLogsCount}</p>
-            <p className="text-xs text-slate-500 mt-3 font-medium">Write-once append-only event stream</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Total audit events recorded</p>
           </div>
 
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
@@ -1288,20 +1369,18 @@ export const DashboardPage: React.FC = () => {
               <KeyRound className="h-4 w-4 text-indigo-600" />
             </div>
             <p className="text-2xl font-black text-indigo-600 font-mono tracking-tight">
-              {privilegedOperationsCount} Events
+              {privilegedOperationsCount}
             </p>
-            <p className="text-xs text-slate-500 mt-3 font-medium">Admin role updates & policy changes</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Admin & policy changes</p>
           </div>
 
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
             <div className="flex items-center justify-between text-slate-400 mb-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider">Active Threats</span>
-              <ShieldAlert className="h-4 w-4 text-emerald-600" />
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Monitored Domains</span>
+              <ShieldAlert className="h-4 w-4 text-[#00a88f]" />
             </div>
-            <p className="text-2xl font-black text-emerald-600 font-mono tracking-tight">0 Anomalies</p>
-            <p className="text-xs text-emerald-600 mt-3 font-medium flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5" /> No unauthorized tampering detected
-            </p>
+            <p className="text-2xl font-black text-[#00a88f] font-mono tracking-tight">{eventsByResource.length}</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">Distinct audited resource categories</p>
           </div>
         </div>
 
@@ -1340,59 +1419,68 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Chart 2: Privileged Administrative Operations */}
+          {/* Chart 2: Security Telemetry & Privileged Mutation Timeline */}
           <div className="telemetry-card bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-[#0a2540] flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-indigo-600" /> Privileged Operations Frequency
+                  <Activity className="h-4 w-4 text-indigo-600" /> Security Telemetry & Privileged Velocity
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">High-privilege administrator actions tracked</p>
+                <p className="text-xs text-slate-400 mt-0.5">7-day audit volume vs high-privilege administrative actions</p>
               </div>
             </div>
             <div className="h-72">
-              {privilegedOpsBreakdown.length > 0 ? (
+              {securityActivityTrend && securityActivityTrend.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    layout="vertical"
-                    data={privilegedOpsBreakdown}
-                    margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <AreaChart data={securityActivityTrend} margin={{ top: 10, right: 15, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="totalAuditGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0a2540" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#0a2540" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="privMutationGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                     <XAxis
-                      type="number"
-                      allowDecimals={false}
+                      dataKey="date"
                       tick={{ fontSize: 10, fill: '#64748b' }}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="action"
-                      width={150}
-                      interval={0}
                       axisLine={false}
                       tickLine={false}
-                      tick={({ y, payload }) => (
-                        <text
-                          x={0}
-                          y={y}
-                          dy={3.5}
-                          textAnchor="start"
-                          fill="#475569"
-                          fontSize={10}
-                          fontWeight={600}
-                          fontFamily="monospace"
-                        >
-                          {payload.value}
-                        </text>
-                      )}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      axisLine={false}
+                      tickLine={false}
                     />
                     <Tooltip content={<CustomChartTooltip />} />
-                    <Bar dataKey="count" name="Event Count" fill="#6366f1" radius={[0, 4, 4, 0]} />
-                  </BarChart>
+                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '6px' }} />
+                    <Area
+                      type="monotone"
+                      dataKey="totalEvents"
+                      name="Total Audit Events"
+                      stroke="#0a2540"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#totalAuditGradient)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="privilegedEvents"
+                      name="Privileged Mutations"
+                      stroke="#6366f1"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#privMutationGradient)"
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-xs text-slate-400">
-                  No privileged administrative operations recorded yet.
+                  No security telemetry recorded for this timeframe.
                 </div>
               )}
             </div>

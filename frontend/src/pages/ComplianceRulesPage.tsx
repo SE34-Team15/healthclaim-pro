@@ -351,7 +351,7 @@ export const ComplianceRulesPage: React.FC = () => {
             const expressionStr = astToExpression(rule.astDefinition as unknown as AstNode);
             const isBeingDragged = draggingIndex === index;
 
-            // Calculate interactive displacement offset (让位位移)
+            // Calculate interactive displacement offset
             let translateY = 0;
             const stride = itemHeightRef.current + 10;
 

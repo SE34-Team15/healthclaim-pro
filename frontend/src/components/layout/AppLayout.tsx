@@ -144,9 +144,9 @@ export const AppLayout: React.FC = () => {
   const roleMeta = user?.role ? ROLE_METADATA[user.role] : ROLE_METADATA[UserRole.EMPLOYEE];
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-[#f8fafc] flex flex-col md:flex-row text-slate-900 selection:bg-[#0a2540] selection:text-white">
+    <div className="h-screen w-full overflow-hidden bg-[#f8fafc] flex flex-col md:flex-row text-slate-900 selection:bg-[#0a2540] selection:text-white print:h-auto print:overflow-visible print:bg-white">
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex flex-col w-64 h-full shrink-0 bg-white border-r border-slate-200/80 z-20 shadow-xs">
+      <aside className="hidden md:flex flex-col w-64 h-full shrink-0 bg-white border-r border-slate-200/80 z-20 shadow-xs print:hidden">
         {/* Brand Header with Clean Logo (Pure Logo, No Text, Scaled with Sidebar Width) */}
         <div className="flex items-center justify-center p-3.5 border-b border-slate-100 shrink-0">
           <img
@@ -192,9 +192,9 @@ export const AppLayout: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden print:h-auto print:overflow-visible">
         {/* Top Header */}
-        <header className="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-6 flex items-center justify-between z-10">
+        <header className="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-6 flex items-center justify-between z-10 print:hidden">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -241,7 +241,7 @@ export const AppLayout: React.FC = () => {
 
         {/* Mobile Dropdown Nav */}
         {mobileMenuOpen && (
-          <div className="md:hidden shrink-0 bg-white border-b border-slate-200 px-4 py-3 space-y-1">
+          <div className="md:hidden shrink-0 bg-white border-b border-slate-200 px-4 py-3 space-y-1 print:hidden">
             {filteredNavItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -267,7 +267,7 @@ export const AppLayout: React.FC = () => {
         )}
 
         {/* Page Main Content */}
-        <main ref={mainContentRef} className="flex-1 p-6 md:p-8 overflow-y-auto min-h-0">
+        <main ref={mainContentRef} className="flex-1 p-6 md:p-8 overflow-y-auto min-h-0 print:p-0 print:overflow-visible print:h-auto">
           <Outlet />
         </main>
       </div>
