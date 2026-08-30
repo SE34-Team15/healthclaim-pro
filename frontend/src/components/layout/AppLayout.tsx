@@ -13,7 +13,6 @@ import {
   Menu,
   X,
   Layers,
-  ChevronRight,
   FilePlus2,
   Receipt,
   FileCheck2,
@@ -28,13 +27,47 @@ export const AppLayout: React.FC = () => {
   const mainContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (mainContentRef.current) {
+    if (!mainContentRef.current) return;
+
+    // Reset scroll position on route switch
+    mainContentRef.current.scrollTop = 0;
+
+    const ctx = gsap.context(() => {
+      // 1. Smooth page entrance glide
       gsap.fromTo(
         mainContentRef.current,
-        { opacity: 0.9, y: 6 },
-        { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out' },
+        { opacity: 0, y: 12 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.32,
+          ease: 'power3.out',
+          clearProps: 'transform',
+        },
       );
-    }
+
+      // 2. Cascade stagger effect across page cards and sections
+      const animatedElements = mainContentRef.current?.querySelectorAll(
+        '.telemetry-card, .metric-card, .audit-card, form, .pipeline-card, .page-header',
+      );
+
+      if (animatedElements && animatedElements.length > 0) {
+        gsap.fromTo(
+          animatedElements,
+          { opacity: 0, y: 14 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.38,
+            stagger: 0.04,
+            ease: 'power2.out',
+            clearProps: 'all',
+          },
+        );
+      }
+    }, mainContentRef);
+
+    return () => ctx.revert();
   }, [location.pathname]);
 
   const navItems = [
@@ -132,18 +165,15 @@ export const AppLayout: React.FC = () => {
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
+                  `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
                     isActive
                       ? 'bg-[#0a2540] text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/80'
                   }`
                 }
               >
-                <div className="flex items-center gap-2.5">
-                  <Icon className="h-4 w-4 stroke-[1.75]" />
-                  <span>{item.label}</span>
-                </div>
-                <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+                <Icon className="h-4 w-4 stroke-[1.75]" />
+                <span>{item.label}</span>
               </NavLink>
             );
           })}

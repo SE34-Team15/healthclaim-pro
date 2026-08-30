@@ -358,7 +358,9 @@ async function main() {
       category: ClaimCategory.HOSPITALIZATION,
       hospitalName: 'Singapore General Hospital (SGH)',
       hospitalGrade: 'PUBLIC_TERTIARY',
-      invoiceDate: new Date('2026-06-15'),
+      invoiceDate: new Date('2026-06-15T09:00:00Z'),
+      createdAt: new Date('2026-06-18T09:00:00Z'),
+      reviewedAt: new Date('2026-06-18T13:15:00Z'), // 4.25 hours review latency
       totalAmount: 1200.0,
       deductibleCovered: 100.0,
       coPayRate: 0.8,
@@ -367,7 +369,6 @@ async function main() {
       status: ClaimStatus.SETTLED,
       statusReason: 'Inpatient recovery subsidy settled via corporate treasury.',
       reviewedBy: financeUser.id,
-      reviewedAt: new Date('2026-06-18'),
       items: [
         { description: 'Acute Inpatient Hospitalization (2 nights)', category: ClaimCategory.HOSPITALIZATION, unitPrice: 900.0, quantity: 1, totalPrice: 900.0 },
         { description: 'Diagnostic Radiology & CT Scan', category: ClaimCategory.HOSPITALIZATION, unitPrice: 300.0, quantity: 1, totalPrice: 300.0 },
@@ -379,7 +380,9 @@ async function main() {
       category: ClaimCategory.DENTAL,
       hospitalName: 'Novena Specialist Dental Care',
       hospitalGrade: 'SPECIALIST_CENTRE',
-      invoiceDate: new Date('2026-07-20'),
+      invoiceDate: new Date('2026-07-20T10:00:00Z'),
+      createdAt: new Date('2026-07-22T10:00:00Z'),
+      reviewedAt: new Date('2026-07-22T12:30:00Z'), // 2.5 hours review latency
       totalAmount: 350.0,
       deductibleCovered: 0.0,
       coPayRate: 0.8,
@@ -388,7 +391,6 @@ async function main() {
       status: ClaimStatus.OFFICER_APPROVED,
       statusReason: 'Dental prophylaxis & root canal approved by Officer.',
       reviewedBy: officerUser.id,
-      reviewedAt: new Date('2026-07-22'),
       items: [
         { description: 'Root Canal Endodontic Therapy', category: ClaimCategory.DENTAL, unitPrice: 250.0, quantity: 1, totalPrice: 250.0 },
         { description: 'Preventative Ultrasonic Dental Scaling', category: ClaimCategory.DENTAL, unitPrice: 100.0, quantity: 1, totalPrice: 100.0 },
@@ -400,7 +402,9 @@ async function main() {
       category: ClaimCategory.CONSULTATION,
       hospitalName: 'National University Hospital (NUH) Outpatient Clinic',
       hospitalGrade: 'PUBLIC_TERTIARY',
-      invoiceDate: new Date('2026-08-10'),
+      invoiceDate: new Date('2026-08-10T14:20:00Z'),
+      createdAt: new Date('2026-08-10T14:20:00Z'),
+      reviewedAt: new Date('2026-08-10T14:20:05Z'), // Straight through in 5 seconds
       totalAmount: 250.0,
       deductibleCovered: 0.0,
       coPayRate: 0.8,
@@ -419,7 +423,9 @@ async function main() {
       category: ClaimCategory.HEALTH_SCREENING,
       hospitalName: 'Gleneagles Hospital Executive Health Clinic',
       hospitalGrade: 'PRIVATE_TERTIARY',
-      invoiceDate: new Date('2026-05-12'),
+      invoiceDate: new Date('2026-05-12T08:30:00Z'),
+      createdAt: new Date('2026-05-15T08:30:00Z'),
+      reviewedAt: new Date('2026-05-15T10:00:00Z'), // 1.5 hours review latency
       totalAmount: 650.0,
       deductibleCovered: 50.0,
       coPayRate: 0.9,
@@ -428,7 +434,6 @@ async function main() {
       status: ClaimStatus.SETTLED,
       statusReason: 'Executive comprehensive wellness screening settled.',
       reviewedBy: financeUser.id,
-      reviewedAt: new Date('2026-05-15'),
       items: [
         { description: 'Executive Comprehensive Biomarker Panel', category: ClaimCategory.HEALTH_SCREENING, unitPrice: 450.0, quantity: 1, totalPrice: 450.0 },
         { description: 'Cardiovascular Stress & ECG Assessment', category: ClaimCategory.HEALTH_SCREENING, unitPrice: 200.0, quantity: 1, totalPrice: 200.0 },
@@ -440,7 +445,9 @@ async function main() {
       category: ClaimCategory.OPTICAL,
       hospitalName: 'Mount Elizabeth Specialist Eye & Vision Centre',
       hospitalGrade: 'SPECIALIST_CENTRE',
-      invoiceDate: new Date('2026-06-25'),
+      invoiceDate: new Date('2026-06-25T11:00:00Z'),
+      createdAt: new Date('2026-06-28T11:00:00Z'),
+      reviewedAt: new Date('2026-06-28T13:45:00Z'), // 2.75 hours review latency
       totalAmount: 280.0,
       deductibleCovered: 100.0,
       coPayRate: 0.8,
@@ -449,7 +456,6 @@ async function main() {
       status: ClaimStatus.SETTLED,
       statusReason: 'Prescription optical correction settled.',
       reviewedBy: financeUser.id,
-      reviewedAt: new Date('2026-06-28'),
       items: [
         { description: 'Refractive Corneal & Optical Examination', category: ClaimCategory.OPTICAL, unitPrice: 80.0, quantity: 1, totalPrice: 80.0 },
         { description: 'Prescription Corrective Lenses', category: ClaimCategory.OPTICAL, unitPrice: 200.0, quantity: 1, totalPrice: 200.0 },
@@ -461,7 +467,9 @@ async function main() {
       category: ClaimCategory.CONSULTATION,
       hospitalName: 'SingHealth Polyclinic & Community Hospital',
       hospitalGrade: 'COMMUNITY_HOSPITAL',
-      invoiceDate: new Date('2026-08-05'),
+      invoiceDate: new Date('2026-08-05T09:30:00Z'),
+      createdAt: new Date('2026-08-08T09:30:00Z'),
+      reviewedAt: new Date('2026-08-08T12:00:00Z'), // 2.5 hours review latency
       totalAmount: 420.0,
       deductibleCovered: 100.0,
       coPayRate: 0.8,
@@ -470,7 +478,6 @@ async function main() {
       status: ClaimStatus.FINANCE_APPROVED,
       statusReason: 'Approved by Finance, scheduled in next weekly payout run.',
       reviewedBy: financeUser.id,
-      reviewedAt: new Date('2026-08-08'),
       items: [
         { description: 'Urgent Care Outpatient Triage & Treatment', category: ClaimCategory.CONSULTATION, unitPrice: 220.0, quantity: 1, totalPrice: 220.0 },
         { description: 'Antibiotic Therapy & Medications', category: ClaimCategory.MEDICATION, unitPrice: 200.0, quantity: 1, totalPrice: 200.0 },
@@ -482,7 +489,9 @@ async function main() {
       category: ClaimCategory.CONSULTATION,
       hospitalName: 'Tan Tock Seng Hospital (TTSH) Specialist Outpatient Clinic',
       hospitalGrade: 'PUBLIC_TERTIARY',
-      invoiceDate: new Date('2026-07-15'),
+      invoiceDate: new Date('2026-07-15T14:00:00Z'),
+      createdAt: new Date('2026-07-18T14:00:00Z'),
+      reviewedAt: new Date('2026-07-18T16:15:00Z'), // 2.25 hours review latency
       totalAmount: 220.0,
       deductibleCovered: 100.0,
       coPayRate: 0.8,
@@ -491,7 +500,6 @@ async function main() {
       status: ClaimStatus.SETTLED,
       statusReason: 'Outpatient consultation reimbursed.',
       reviewedBy: financeUser.id,
-      reviewedAt: new Date('2026-07-18'),
       items: [
         { description: 'Dermatology Consultation & Prescription', category: ClaimCategory.CONSULTATION, unitPrice: 220.0, quantity: 1, totalPrice: 220.0 },
       ],
@@ -502,7 +510,9 @@ async function main() {
       category: ClaimCategory.DENTAL,
       hospitalName: 'Raffles Medical Family Dental Clinic',
       hospitalGrade: 'GP_CLINIC',
-      invoiceDate: new Date('2026-08-22'),
+      invoiceDate: new Date('2026-08-22T15:00:00Z'),
+      createdAt: new Date('2026-08-22T15:00:00Z'),
+      reviewedAt: null, // Pending officer review
       totalAmount: 1250.0,
       deductibleCovered: 0.0,
       coPayRate: 0.8,
@@ -531,6 +541,7 @@ async function main() {
           hospitalName: sc.hospitalName,
           hospitalGrade: sc.hospitalGrade,
           invoiceDate: sc.invoiceDate,
+          createdAt: sc.createdAt,
           totalAmount: sc.totalAmount,
           deductibleCovered: sc.deductibleCovered,
           coPayRate: sc.coPayRate,

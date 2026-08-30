@@ -22,11 +22,17 @@ import {
   Eye,
   ArrowUp,
   ArrowDown,
+  FileText,
+  Lock,
 } from 'lucide-react';
-import { AstNode, ComplianceRule, LogicalOperator, ComparisonOperator } from '@healthclaim/shared';
+import { AstNode, ComplianceRule, LogicalOperator, ComparisonOperator, UserRole } from '@healthclaim/shared';
 import { AstRuleBuilder, astToExpression } from '../components/rules/AstRuleBuilder';
+import { useAuth } from '../auth/AuthContext';
 
 export const ComplianceRulesPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === UserRole.SYSTEM_ADMIN;
+
   const [rules, setRules] = useState<ComplianceRule[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -316,14 +322,18 @@ export const ComplianceRulesPage: React.FC = () => {
             Compliance Rules Pipeline
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Rules execute sequentially from top to bottom. Drag cards vertically to reorder priority.
+            {isAdmin
+              ? 'Rules execute sequentially from top to bottom. Drag cards vertically to reorder priority.'
+              : 'Active automated compliance validation rules evaluated during claim pre-flight auditing.'}
           </p>
         </div>
 
-        <Button onClick={() => setIsCreateOpen(true)} className="gap-2 font-semibold">
-          <Plus className="h-4 w-4" />
-          <span>New AST Rule</span>
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setIsCreateOpen(true)} className="gap-2 font-semibold">
+            <Plus className="h-4 w-4" />
+            <span>New AST Rule</span>
+          </Button>
+        )}
       </div>
 
       {/* Reorderable Pipeline Container with Relative Coordinate Space */}
@@ -378,19 +388,21 @@ export const ComplianceRulesPage: React.FC = () => {
               >
                 {/* Left: Drag Handle & Rank Badge */}
                 <div className="flex items-center gap-3 shrink-0">
-                  <div
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      handlePointerDown(e, index);
-                    }}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    className="p-1.5 rounded-lg text-slate-300 group-hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-grab active:cursor-grabbing touch-none"
-                    title="Drag vertically to reorder priority"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <GripVertical className="h-4 w-4" />
-                  </div>
+                  {isAdmin && (
+                    <div
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        handlePointerDown(e, index);
+                      }}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={handlePointerUp}
+                      className="p-1.5 rounded-lg text-slate-300 group-hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-grab active:cursor-grabbing touch-none"
+                      title="Drag vertically to reorder priority"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5 font-mono">
                     <span className="text-xs font-extrabold text-[#0a2540] bg-slate-100 px-2.5 py-1 rounded-lg">
                       #{index + 1}
@@ -407,11 +419,6 @@ export const ComplianceRulesPage: React.FC = () => {
                     <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
                       {rule.code}
                     </span>
-                    {index === 0 && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
-                        Evaluates First
-                      </span>
-                    )}
                     {rule.isActive ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#00a88f] bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
                         <CheckCircle2 className="h-3 w-3" /> Active
@@ -430,26 +437,28 @@ export const ComplianceRulesPage: React.FC = () => {
 
                 {/* Right: Quick Action Controls */}
                 <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-                    <button
-                      type="button"
-                      disabled={index === 0}
-                      onClick={() => handleMoveRule(index, 'UP')}
-                      className="p-1 rounded text-slate-600 hover:bg-white disabled:opacity-30 disabled:hover:bg-transparent"
-                      title="Move Up"
-                    >
-                      <ArrowUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={index === rules.length - 1}
-                      onClick={() => handleMoveRule(index, 'DOWN')}
-                      className="p-1 rounded text-slate-600 hover:bg-white disabled:opacity-30 disabled:hover:bg-transparent"
-                      title="Move Down"
-                    >
-                      <ArrowDown className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        onClick={() => handleMoveRule(index, 'UP')}
+                        className="p-1 rounded text-slate-600 hover:bg-white disabled:opacity-30 disabled:hover:bg-transparent"
+                        title="Move Up"
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={index === rules.length - 1}
+                        onClick={() => handleMoveRule(index, 'DOWN')}
+                        className="p-1 rounded text-slate-600 hover:bg-white disabled:opacity-30 disabled:hover:bg-transparent"
+                        title="Move Down"
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
 
                   <Button
                     variant="outline"
@@ -457,18 +466,29 @@ export const ComplianceRulesPage: React.FC = () => {
                     onClick={() => handleOpenEdit(rule)}
                     className="h-8 text-xs gap-1.5 font-medium"
                   >
-                    <Eye className="h-3.5 w-3.5" />
-                    <span>Inspect & Edit</span>
+                    {isAdmin ? (
+                      <>
+                        <Edit3 className="h-3.5 w-3.5" />
+                        <span>Inspect & Edit</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>View Details</span>
+                      </>
+                    )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDeletingRule(rule)}
-                    className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-slate-200"
-                    title="Delete Rule"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeletingRule(rule)}
+                      className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-slate-200"
+                      title="Delete Rule"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               </div>
             );
@@ -479,27 +499,26 @@ export const ComplianceRulesPage: React.FC = () => {
         {draggingIndex !== null && activeDraggedRule && (
           <div
             style={{
-              position: 'absolute',
               top: `${dragRelativeY}px`,
               left: 0,
               right: 0,
               width: '100%',
-              zIndex: 50,
-              pointerEvents: 'none',
             }}
-            className="bg-white rounded-2xl border-2 border-[#0a2540] p-4 shadow-2xl scale-[1.01] ring-4 ring-slate-900/10 flex items-center justify-between gap-4 select-none cursor-grabbing"
+            className="absolute bg-white rounded-2xl border-2 border-indigo-500 shadow-2xl p-4 flex items-center justify-between gap-4 z-50 pointer-events-none scale-[1.01] transition-transform"
           >
             <div className="flex items-center gap-3 shrink-0">
-              <div className="p-1.5 rounded-lg text-[#0a2540]">
+              <div className="p-1.5 rounded-lg text-indigo-600 bg-indigo-50">
                 <GripVertical className="h-4 w-4" />
               </div>
-              <span className="text-xs font-extrabold text-white bg-[#0a2540] px-2.5 py-1 rounded-lg font-mono">
-                #{targetSlotIndex !== null ? targetSlotIndex + 1 : draggingIndex + 1}
-              </span>
+              <div className="flex items-center gap-1.5 font-mono">
+                <span className="text-xs font-extrabold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg">
+                  #{targetSlotIndex !== null ? targetSlotIndex + 1 : draggingIndex + 1}
+                </span>
+              </div>
             </div>
 
             <div className="flex-1 min-w-0 space-y-1">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-xs font-bold text-[#0a2540]">
                   {activeDraggedRule.name}
                 </span>
@@ -507,21 +526,24 @@ export const ComplianceRulesPage: React.FC = () => {
                   {activeDraggedRule.code}
                 </span>
               </div>
-              <p className="text-[11px] font-mono text-emerald-700 font-semibold truncate">
-                {astToExpression(activeDraggedRule.astDefinition as unknown as AstNode)}
+              <p className="text-[11px] font-mono text-slate-500 truncate max-w-2xl">
+                <span className="text-slate-400 font-sans">Expression: </span>
+                <span className="text-emerald-700 font-semibold">
+                  {astToExpression(activeDraggedRule.astDefinition as unknown as AstNode)}
+                </span>
               </p>
             </div>
 
-            <span className="text-[11px] font-bold text-[#0a2540] bg-slate-100 px-3 py-1 rounded-xl">
-              Moving...
-            </span>
+            <div className="flex items-center gap-2 shrink-0 opacity-40">
+              <div className="h-8 w-24 bg-slate-100 rounded-lg" />
+            </div>
           </div>
         )}
       </div>
 
       {/* Create Rule Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto overflow-x-hidden p-6">
           <DialogHeader className="pr-6">
             <DialogTitle className="flex items-center gap-2">
               <Plus className="h-4 w-4" /> Create Compliance Rule (AST Engine)
@@ -542,7 +564,7 @@ export const ComplianceRulesPage: React.FC = () => {
                   onClick={() => applyTemplate('DENTAL')}
                   className="text-[11px] h-7 bg-white"
                 >
-                  OR / NOT Logic (Dental Cap)
+                  OR Operator (Dental $1,000 Cap)
                 </Button>
                 <Button
                   type="button"
@@ -600,7 +622,7 @@ export const ComplianceRulesPage: React.FC = () => {
             </div>
 
             {/* Cloudflare Dual-Mode AST Rule Builder Component */}
-            <div className="pt-2">
+            <div className="pt-2 max-w-full overflow-hidden">
               <AstRuleBuilder
                 initialAst={createAst}
                 onChange={(newAst) => setCreateAst(newAst)}
@@ -633,10 +655,21 @@ export const ComplianceRulesPage: React.FC = () => {
 
       {/* Edit / Inspect Rule Dialog */}
       <Dialog open={!!editingRule} onOpenChange={(open) => !open && setEditingRule(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto overflow-x-hidden p-6">
           <DialogHeader className="pr-6">
-            <DialogTitle className="flex items-center gap-2">
-              <Edit3 className="h-4 w-4" /> Rule Details & AST Builder: {editingRule?.code}
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              {isAdmin ? (
+                <>
+                  <Edit3 className="h-4 w-4" /> Rule Details & AST Builder: {editingRule?.code}
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4 text-indigo-600" /> Rule Specification: {editingRule?.code}
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 inline-flex items-center gap-1 font-mono">
+                    <Lock className="h-3 w-3 text-slate-400" /> Read-Only
+                  </span>
+                </>
+              )}
             </DialogTitle>
           </DialogHeader>
 
@@ -648,8 +681,10 @@ export const ComplianceRulesPage: React.FC = () => {
                   <Input
                     type="text"
                     required
+                    disabled={!isAdmin}
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
+                    className={!isAdmin ? 'bg-slate-50 text-slate-700 cursor-default' : ''}
                   />
                 </div>
                 <div>
@@ -658,7 +693,7 @@ export const ComplianceRulesPage: React.FC = () => {
                     type="text"
                     disabled
                     value={editingRule.code}
-                    className="font-mono bg-slate-50 text-slate-500"
+                    className="font-mono bg-slate-50 text-slate-500 cursor-default"
                   />
                 </div>
               </div>
@@ -667,15 +702,18 @@ export const ComplianceRulesPage: React.FC = () => {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
                 <Input
                   type="text"
+                  disabled={!isAdmin}
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
+                  className={!isAdmin ? 'bg-slate-50 text-slate-700 cursor-default' : ''}
                 />
               </div>
 
               {/* Cloudflare Dual-Mode AST Rule Builder Component */}
-              <div className="pt-2">
+              <div className="pt-2 max-w-full overflow-hidden">
                 <AstRuleBuilder
                   initialAst={editAst}
+                  readOnly={!isAdmin}
                   onChange={(newAst) => setEditAst(newAst)}
                 />
               </div>
@@ -684,21 +722,30 @@ export const ComplianceRulesPage: React.FC = () => {
               <div className="flex items-center gap-2 pt-2">
                 <Checkbox
                   id="editIsActive"
+                  disabled={!isAdmin}
                   checked={editIsActive}
                   onCheckedChange={(checked) => setEditIsActive(checked === true)}
                 />
-                <label htmlFor="editIsActive" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                <label htmlFor="editIsActive" className={`text-xs font-semibold text-slate-700 ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}>
                   Active rule (evaluated during claim pre-flight)
                 </label>
               </div>
 
               <DialogFooter className="pt-3">
-                <Button type="button" variant="outline" onClick={() => setEditingRule(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={savingEdit}>
-                  {savingEdit ? 'Updating...' : 'Save AST Changes'}
-                </Button>
+                {isAdmin ? (
+                  <>
+                    <Button type="button" variant="outline" onClick={() => setEditingRule(null)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={savingEdit}>
+                      {savingEdit ? 'Updating...' : 'Save AST Changes'}
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" onClick={() => setEditingRule(null)}>
+                    Close
+                  </Button>
+                )}
               </DialogFooter>
             </form>
           )}

@@ -11,7 +11,6 @@ import {
   NotFoundException,
   ForbiddenException,
   Res,
-  Ip,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -20,6 +19,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ClientIp } from '../common/decorators/client-ip.decorator';
 import { UserRole, ReceiptAttachmentDto } from '@healthclaim/shared';
 
 const ALLOWED_MIME_TYPES = [
@@ -53,7 +53,7 @@ export class AttachmentsController {
   async uploadAttachment(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser('id') userId: string,
-    @Ip() ipAddress: string,
+    @ClientIp() ipAddress: string,
   ): Promise<ReceiptAttachmentDto> {
     if (!file) {
       throw new BadRequestException('No file attachment uploaded.');
@@ -123,7 +123,7 @@ export class AttachmentsController {
     @Param('id') id: string,
     @CurrentUser() currentUser: { id: string; role: UserRole },
     @Res() res: Response,
-    @Ip() ipAddress: string,
+    @ClientIp() ipAddress: string,
   ) {
     const attachment = await this.prisma.receiptAttachment.findUnique({
       where: { id },
@@ -193,7 +193,7 @@ export class AttachmentsController {
     @Param('id') id: string,
     @CurrentUser() currentUser: { id: string; role: UserRole },
     @Res() res: Response,
-    @Ip() ipAddress: string,
+    @ClientIp() ipAddress: string,
   ) {
     const attachment = await this.prisma.receiptAttachment.findUnique({
       where: { id },
@@ -247,7 +247,7 @@ export class AttachmentsController {
   async deleteAttachment(
     @Param('id') id: string,
     @CurrentUser() currentUser: { id: string; role: UserRole },
-    @Ip() ipAddress: string,
+    @ClientIp() ipAddress: string,
   ) {
     const attachment = await this.prisma.receiptAttachment.findUnique({
       where: { id },

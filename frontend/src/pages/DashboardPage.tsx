@@ -371,10 +371,22 @@ export const DashboardPage: React.FC = () => {
             <div className="h-64">
               {categoryBreakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryBreakdown} layout="vertical" margin={{ top: 5, right: 20, left: 40, bottom: 5 }}>
+                  <BarChart data={categoryBreakdown} layout="vertical" margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `$${v}`} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: '#334155' }} width={90} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(v) => `$${v}`} />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={100}
+                      interval={0}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={({ y, payload }) => (
+                        <text x={0} y={y} dy={3.5} textAnchor="start" fill="#475569" fontSize={10.5} fontWeight={500}>
+                          {payload.value}
+                        </text>
+                      )}
+                    />
                     <Tooltip content={<CustomChartTooltip />} />
                     <Bar dataKey="value" name="Amount" radius={[0, 6, 6, 0]}>
                       {categoryBreakdown.map((_: any, index: number) => (
@@ -557,7 +569,10 @@ export const DashboardPage: React.FC = () => {
               <span className="text-[11px] font-semibold uppercase tracking-wider">STP Auto-Pass Rate</span>
               <Zap className="h-4 w-4 text-[#00a88f]" />
             </div>
-            <p className="text-2xl font-black text-[#00a88f] font-mono tracking-tight">{stpRate}%</p>
+            <p className="text-2xl font-black text-[#00a88f] font-mono tracking-tight flex items-baseline">
+              {stpRate}
+              <span className="text-lg font-bold font-sans ml-1 text-[#00a88f]/80">%</span>
+            </p>
             <p className="text-xs text-slate-500 mt-3">Straight-through validation with 0 human intervention</p>
           </div>
 
@@ -601,16 +616,45 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Execution volume and rule anomaly intercepts</p>
               </div>
             </div>
-            <div className="h-64">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ruleExecutionStats} margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                <BarChart
+                  layout="vertical"
+                  data={ruleExecutionStats}
+                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={150}
+                    interval={0}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={({ y, payload }) => (
+                      <text
+                        x={0}
+                        y={y}
+                        dy={3.5}
+                        textAnchor="start"
+                        fill="#475569"
+                        fontSize={10}
+                        fontWeight={600}
+                        fontFamily="monospace"
+                      >
+                        {payload.value}
+                      </text>
+                    )}
+                  />
                   <Tooltip content={<CustomChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                  <Bar dataKey="executions" name="Executions" fill="#0a2540" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="flagged" name="Flagged Anomaly" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '4px' }} />
+                  <Bar dataKey="executions" name="Executions" fill="#0a2540" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="flagged" name="Flagged Anomaly" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -625,7 +669,7 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Accreditation distribution of claimant institutions</p>
               </div>
             </div>
-            <div className="h-64 flex items-center justify-center">
+            <div className="h-72 flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -795,7 +839,7 @@ export const DashboardPage: React.FC = () => {
               <Building2 className="h-4 w-4 text-[#0a2540]" />
             </div>
             <p className="text-2xl font-black text-[#0a2540] font-mono tracking-tight">
-              {departmentSpending.length} Depts
+              {departmentSpending.length}
             </p>
             <p className="text-xs text-slate-500 mt-3 font-medium">100% Dynamic corporate entities</p>
           </div>
@@ -815,14 +859,43 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={departmentSpending} margin={{ top: 10, right: 30, left: 10, bottom: 25 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="department" tick={{ fontSize: 10, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `$${v}`} />
+              <BarChart
+                layout="vertical"
+                data={departmentSpending}
+                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis
+                  type="number"
+                  allowDecimals={false}
+                  tick={{ fontSize: 10, fill: '#64748b' }}
+                  tickFormatter={(v) => `$${v}`}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="department"
+                  width={140}
+                  interval={0}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={({ y, payload }) => (
+                    <text
+                      x={0}
+                      y={y}
+                      dy={3.5}
+                      textAnchor="start"
+                      fill="#475569"
+                      fontSize={10.5}
+                      fontWeight={500}
+                    >
+                      {payload.value}
+                    </text>
+                  )}
+                />
                 <Tooltip content={<CustomChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                <Bar dataKey="totalDisbursed" name="Total Subsidies ($)" fill="#00a88f" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="avgPerClaim" name="Avg per Claim ($)" fill="#0a2540" radius={[4, 4, 0, 0]} />
+                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '4px' }} />
+                <Bar dataKey="totalDisbursed" name="Total Subsidies ($)" fill="#00a88f" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="avgPerClaim" name="Avg per Claim ($)" fill="#0a2540" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -838,7 +911,7 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Actual corporate disbursements by claim date</p>
               </div>
             </div>
-            <div className="h-60">
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={monthlyDisbursementTrend} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                   <defs>
@@ -873,14 +946,43 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Invoices pending disbursement grouped by latency</p>
               </div>
             </div>
-            <div className="h-60">
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={agingBacklog} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `$${v}`} />
+                <BarChart
+                  layout="vertical"
+                  data={agingBacklog}
+                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
+                    tickFormatter={(v) => `$${v}`}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="bucket"
+                    width={90}
+                    interval={0}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={({ y, payload }) => (
+                      <text
+                        x={0}
+                        y={y}
+                        dy={3.5}
+                        textAnchor="start"
+                        fill="#475569"
+                        fontSize={10.5}
+                        fontWeight={500}
+                      >
+                        {payload.value}
+                      </text>
+                    )}
+                  />
                   <Tooltip content={<CustomChartTooltip />} />
-                  <Bar dataKey="amount" name="Pending Amount ($)" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="amount" name="Pending Amount ($)" fill="#6366f1" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -943,7 +1045,7 @@ export const DashboardPage: React.FC = () => {
               <span className="text-[11px] font-semibold uppercase tracking-wider">Enterprise Members</span>
               <Users className="h-4 w-4 text-[#0a2540]" />
             </div>
-            <p className="text-2xl font-black text-[#0a2540] font-mono tracking-tight">{totalMembers} In Roster</p>
+            <p className="text-2xl font-black text-[#0a2540] font-mono tracking-tight">{totalMembers}</p>
             <p className="text-xs text-slate-500 mt-3 font-medium">
               <span className="text-emerald-600 font-semibold">{activeMembers} Active</span> • 100% RBAC segregated
             </p>
@@ -954,7 +1056,7 @@ export const DashboardPage: React.FC = () => {
               <span className="text-[11px] font-semibold uppercase tracking-wider">Active Departments</span>
               <Building2 className="h-4 w-4 text-[#00a88f]" />
             </div>
-            <p className="text-2xl font-black text-[#00a88f] font-mono tracking-tight">{totalDepartments} Depts</p>
+            <p className="text-2xl font-black text-[#00a88f] font-mono tracking-tight">{totalDepartments}</p>
             <p className="text-xs text-slate-500 mt-3 font-medium">100% Dynamic corporate entities</p>
           </div>
 
@@ -974,7 +1076,10 @@ export const DashboardPage: React.FC = () => {
               <span className="text-[11px] font-semibold uppercase tracking-wider">Global Approval Rate</span>
               <Activity className="h-4 w-4 text-indigo-600" />
             </div>
-            <p className="text-2xl font-black text-indigo-600 font-mono tracking-tight">{globalApprovalRate}%</p>
+            <p className="text-2xl font-black text-indigo-600 font-mono tracking-tight flex items-baseline">
+              {globalApprovalRate}
+              <span className="text-lg font-bold font-sans ml-1 text-indigo-600/80">%</span>
+            </p>
             <p className="text-xs text-emerald-600 mt-3 font-medium flex items-center gap-1">
               <CheckCircle2 className="h-3.5 w-3.5" /> {approvedClaimsCount} approved / {totalClaimsCount} total
             </p>
@@ -993,16 +1098,44 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Member headcount vs submitted claims per department</p>
               </div>
             </div>
-            <div className="h-64">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={departmentWorkforceAndClaims} margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="department" tick={{ fontSize: 10, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                <BarChart
+                  layout="vertical"
+                  data={departmentWorkforceAndClaims}
+                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="department"
+                    width={130}
+                    interval={0}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={({ x, y, payload }) => (
+                      <text
+                        x={0}
+                        y={y}
+                        dy={3.5}
+                        textAnchor="start"
+                        fill="#475569"
+                        fontSize={10.5}
+                        fontWeight={500}
+                      >
+                        {payload.value}
+                      </text>
+                    )}
+                  />
                   <Tooltip content={<CustomChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                  <Bar dataKey="memberCount" name="Headcount" fill="#0a2540" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="claimCount" name="Claims Filed" fill="#00a88f" radius={[4, 4, 0, 0]} />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '4px' }} />
+                  <Bar dataKey="memberCount" name="Headcount" fill="#0a2540" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="claimCount" name="Claims Filed" fill="#00a88f" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1018,7 +1151,7 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Enrolled member count per active benefit policy tier</p>
               </div>
             </div>
-            <div className="h-64 flex items-center justify-center">
+            <div className="h-72 flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -1133,7 +1266,10 @@ export const DashboardPage: React.FC = () => {
               <span className="text-[11px] font-semibold uppercase tracking-wider">Compliance Index</span>
               <ShieldCheck className="h-4 w-4 text-emerald-600" />
             </div>
-            <p className="text-2xl font-black text-emerald-600 font-mono tracking-tight">{complianceScore}%</p>
+            <p className="text-2xl font-black text-emerald-600 font-mono tracking-tight flex items-baseline">
+              {complianceScore}
+              <span className="text-lg font-bold font-sans ml-1 text-emerald-600/80">%</span>
+            </p>
             <p className="text-xs text-slate-500 mt-3 font-medium">All cryptographic & access controls passed</p>
           </div>
 
@@ -1181,7 +1317,7 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Proportional breakdown of security telemetry logs</p>
               </div>
             </div>
-            <div className="h-64 flex items-center justify-center">
+            <div className="h-72 flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -1214,15 +1350,44 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-xs text-slate-400 mt-0.5">High-privilege administrator actions tracked</p>
               </div>
             </div>
-            <div className="h-64">
+            <div className="h-72">
               {privilegedOpsBreakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={privilegedOpsBreakdown} margin={{ top: 10, right: 20, left: 10, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="action" tick={{ fontSize: 10, fill: '#64748b' }} angle={-15} textAnchor="end" />
-                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                  <BarChart
+                    layout="vertical"
+                    data={privilegedOpsBreakdown}
+                    margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      allowDecimals={false}
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="action"
+                      width={150}
+                      interval={0}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={({ y, payload }) => (
+                        <text
+                          x={0}
+                          y={y}
+                          dy={3.5}
+                          textAnchor="start"
+                          fill="#475569"
+                          fontSize={10}
+                          fontWeight={600}
+                          fontFamily="monospace"
+                        >
+                          {payload.value}
+                        </text>
+                      )}
+                    />
                     <Tooltip content={<CustomChartTooltip />} />
-                    <Bar dataKey="count" name="Event Count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="count" name="Event Count" fill="#6366f1" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (

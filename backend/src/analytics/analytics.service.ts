@@ -290,13 +290,18 @@ export class AnalyticsService {
     // Real average triage latency
     const reviewedClaims = claims.filter((c) => c.reviewedAt !== null);
     let totalLatencyHours = 0;
+    let validReviewedCount = 0;
     reviewedClaims.forEach((c) => {
-      if (c.reviewedAt) {
-        totalLatencyHours += (new Date(c.reviewedAt).getTime() - new Date(c.createdAt).getTime()) / (1000 * 3600);
+      if (c.reviewedAt && c.createdAt) {
+        const diffMs = new Date(c.reviewedAt).getTime() - new Date(c.createdAt).getTime();
+        if (diffMs >= 0) {
+          totalLatencyHours += diffMs / (1000 * 3600);
+          validReviewedCount++;
+        }
       }
     });
     const avgTriageLatencyHours =
-      reviewedClaims.length > 0 ? Number((totalLatencyHours / reviewedClaims.length).toFixed(1)) : 1.8;
+      validReviewedCount > 0 ? Number((totalLatencyHours / validReviewedCount).toFixed(1)) : 0;
 
     // Real AST Rule Execution Statistics
     const ruleStatsMap = new Map<string, { executions: number; flagged: number; name: string }>();

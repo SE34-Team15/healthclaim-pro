@@ -7,7 +7,6 @@ import {
   Param,
   Query,
   UseGuards,
-  Ip,
 } from '@nestjs/common';
 import { ClaimsService } from './claims.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -15,6 +14,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { ClientIp } from '../common/decorators/client-ip.decorator';
 import {
   CreateClaimSchema,
   CreateClaimRequest,
@@ -41,7 +41,7 @@ export class ClaimsController {
   async submitClaim(
     @CurrentUser('id') userId: string,
     @Body(new ZodValidationPipe(CreateClaimSchema)) dto: CreateClaimRequest,
-    @Ip() ipAddress: string,
+    @ClientIp() ipAddress: string,
   ) {
     return this.claimsService.submitClaim(userId, dto, ipAddress);
   }
@@ -51,7 +51,7 @@ export class ClaimsController {
     @Param('id') id: string,
     @CurrentUser() user: { id: string; role: UserRole },
     @Body(new ZodValidationPipe(TransitionClaimStatusSchema)) dto: TransitionClaimStatusRequest,
-    @Ip() ipAddress: string,
+    @ClientIp() ipAddress: string,
   ) {
     return this.claimsService.transitionStatus(id, dto.targetStatus, user, dto.reason, ipAddress);
   }
@@ -61,7 +61,7 @@ export class ClaimsController {
   async forcePurgeClaim(
     @Param('id') id: string,
     @CurrentUser('id') adminUserId: string,
-    @Ip() ipAddress: string,
+    @ClientIp() ipAddress: string,
   ) {
     return this.claimsService.forcePurgeClaim(id, adminUserId, ipAddress);
   }

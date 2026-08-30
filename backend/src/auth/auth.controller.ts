@@ -21,6 +21,7 @@ import {
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser, AuthenticatedUser } from './decorators/current-user.decorator';
+import { ClientIp, extractClientIp } from '../common/decorators/client-ip.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -30,9 +31,10 @@ export class AuthController {
   async login(
     @Body(new ZodValidationPipe(LoginRequestSchema)) loginDto: LoginRequest,
     @Req() req: Request,
+    @ClientIp() clientIp?: string,
   ) {
-    const ip = req.ip || req.socket.remoteAddress;
-    const userAgent = req.headers['user-agent'];
+    const ip = clientIp || extractClientIp(req);
+    const userAgent = req?.headers?.['user-agent'];
     return this.authService.login(loginDto, ip, userAgent);
   }
 
@@ -40,9 +42,10 @@ export class AuthController {
   async register(
     @Body(new ZodValidationPipe(RegisterRequestSchema)) registerDto: RegisterRequest,
     @Req() req: Request,
+    @ClientIp() clientIp?: string,
   ) {
-    const ip = req.ip || req.socket.remoteAddress;
-    const userAgent = req.headers['user-agent'];
+    const ip = clientIp || extractClientIp(req);
+    const userAgent = req?.headers?.['user-agent'];
     return this.authService.register(registerDto, ip, userAgent);
   }
 
