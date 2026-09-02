@@ -104,12 +104,12 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50/70 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8 selection:bg-[#0a2540] selection:text-white">
       <div ref={containerRef} className="sm:mx-auto sm:w-full sm:max-w-[420px]">
-        {/* Pure Logo (No Text, Enlarged Prominence) */}
-        <div className="flex flex-col items-center justify-center mb-8 text-center gsap-reveal">
+        {/* Brand Logo Header */}
+        <div className="flex flex-col items-center justify-center mb-4 text-center gsap-reveal">
           <img
             src={BRAND_CONFIG.logoUrl}
             alt={BRAND_CONFIG.fullName}
-            className="w-48 h-48 sm:w-52 sm:h-52 object-contain hover:scale-105 transition-transform duration-300 drop-shadow-xs"
+            className="h-14 sm:h-16 w-auto max-w-[280px] object-contain drop-shadow-xs"
           />
         </div>
 

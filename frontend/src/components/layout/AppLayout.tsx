@@ -147,12 +147,12 @@ export const AppLayout: React.FC = () => {
     <div className="h-screen w-full overflow-hidden bg-[#f8fafc] flex flex-col md:flex-row text-slate-900 selection:bg-[#0a2540] selection:text-white print:h-auto print:overflow-visible print:bg-white">
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex flex-col w-64 h-full shrink-0 bg-white border-r border-slate-200/80 z-20 shadow-xs print:hidden">
-        {/* Brand Header with Clean Logo (Pure Logo, No Text, Scaled with Sidebar Width) */}
-        <div className="flex items-center justify-center p-3.5 border-b border-slate-100 shrink-0">
+        {/* Brand Header with Clean Logo */}
+        <div className="flex items-center justify-center px-4 py-3.5 border-b border-slate-100 shrink-0">
           <img
             src={BRAND_CONFIG.logoUrl}
             alt={BRAND_CONFIG.fullName}
-            className="w-full max-w-[215px] h-36 object-contain hover:scale-[1.02] transition-transform duration-300"
+            className="w-full max-w-[180px] h-10 object-contain"
           />
         </div>
 

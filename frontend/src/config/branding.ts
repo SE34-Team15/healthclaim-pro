@@ -1,4 +1,6 @@
 import { UserRole } from '@healthclaim/shared';
+import logoPng from '../assets/logo.png';
+import faviconPng from '../assets/favicon.png';
 
 export const BRAND_CONFIG = {
   name: 'HealthClaim',
@@ -6,7 +8,8 @@ export const BRAND_CONFIG = {
   fullName: 'HealthClaim Pro',
   slogan: 'Smarter Claims • Faster Settlements • Stronger Privacy',
   description: 'Enterprise Medical Insurance & Intelligent Settlement Platform',
-  logoUrl: '/logo.png',
+  logoUrl: logoPng,
+  faviconUrl: faviconPng,
   appleTouchIcon: '/apple-touch-icon.png',
   themeColor: '#0a2540',
   accentColor: '#00a88f',
