@@ -381,8 +381,7 @@ jobs:
               "export JWT_SECRET=\"${{ secrets.JWT_SECRET }}\"",
               "export MASTER_ENCRYPTION_KEY=\"${{ secrets.MASTER_ENCRYPTION_KEY }}\"",
               "export RESEND_API_KEY=\"${{ secrets.RESEND_API_KEY }}\"",
-              "/usr/local/bin/deploy-bluegreen.sh",
-              "docker run --rm --network host -e DATABASE_URL=\"${{ secrets.DATABASE_URL }}\" ghcr.io/aintor/healthclaim-pro:latest node prisma/sync-rules.js"
+              "/usr/local/bin/deploy-bluegreen.sh"
             ]' \
             --comment "Automated Zero-Downtime Blue/Green Switch" \
             --region "${{ env.AWS_REGION }}" \
