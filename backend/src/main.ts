@@ -14,6 +14,18 @@ async function bootstrap() {
 
   // Trust Cloudflare Edge & AWS ALB upstream reverse proxies for authentic client IP resolution
   app.set('trust proxy', true);
+  app.disable('x-powered-by');
+
+  // Enforce OWASP Baseline Security & Anti-Caching Headers
+  app.use((_req: any, res: any, next: any) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+  });
 
   const port = process.env.PORT || 4000;
   const apiPrefix = process.env.API_PREFIX || '/api/v1';

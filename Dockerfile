@@ -28,7 +28,8 @@ COPY backend ./backend
 COPY frontend ./frontend
 
 # Compile shared, frontend and backend
-RUN pnpm -r build
+RUN pnpm -r build && \
+    rm -rf /app/node_modules/.pnpm/@esbuild* /app/node_modules/.pnpm/esbuild* /app/node_modules/.pnpm/tinypool* /app/node_modules/.pnpm/@vitest* /app/node_modules/.pnpm/vitest*
 
 # Stage 2: Lean Production Runtime Image
 FROM node:24-alpine AS runner
