@@ -38,7 +38,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN apk update && apk upgrade --no-cache && apk add --no-cache libc6-compat openssl
+RUN apk update && apk upgrade --no-cache && apk add --no-cache libc6-compat openssl && \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 
 # Create non-root system user (Least Privilege Security Standard)
 RUN addgroup --system --gid 1001 nodejs && \
