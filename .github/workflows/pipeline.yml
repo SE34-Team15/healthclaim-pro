@@ -189,13 +189,13 @@ jobs:
       - name: Run Playwright E2E Test Suite
         run: pnpm test:e2e
 
-      - name: Upload Playwright Report on Failure
+      - name: Upload Playwright E2E & Integration Report Artifact
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
-          name: playwright-report
+          name: playwright-e2e-report
           path: playwright-report/
-          retention-days: 7
+          retention-days: 14
 
   # ============================================================================
   # STAGE 4: SAST - GITHUB CODEQL STATIC SECURITY ANALYSIS
@@ -237,7 +237,6 @@ jobs:
   owasp-zap-dast:
     name: OWASP ZAP DAST Security Scan
     runs-on: ubuntu-latest
-    needs: [playwright-e2e]
     timeout-minutes: 15
 
     services:
@@ -275,6 +274,14 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 10.33.0
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Install & Bootstrap Backend Service
         run: |
@@ -317,7 +324,159 @@ jobs:
           retention-days: 14
 
   # ============================================================================
-  # STAGE 7: CD - BUILD DOCKER IMAGE & PUSH TO AMAZON ECR
+  # STAGE 6: PERFORMANCE TESTING - k6 LOAD & LATENCY BENCHMARK
+  # ============================================================================
+  k6-performance-test:
+    name: k6 Performance & Load Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: healthclaim_user
+          POSTGRES_PASSWORD: healthclaim_pass
+          POSTGRES_DB: healthclaim_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://healthclaim_user:healthclaim_pass@localhost:5432/healthclaim_db?schema=public
+      JWT_SECRET: super_secret_healthclaim_pro_jwt_key_ci_2026!
+      MASTER_ENCRYPTION_KEY: super_master_encryption_key_32_bytes!
+      PORT: 4000
+      API_PREFIX: /api/v1
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install & Bootstrap Backend Service
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter backend prisma:generate
+          pnpm --filter @healthclaim/shared build
+          pnpm --filter backend prisma:push
+          pnpm --filter backend prisma:seed
+          pnpm build
+
+      - name: Start Production Backend Server for Load Testing
+        run: |
+          pnpm --filter backend start:prod &
+          for i in $(seq 1 30); do
+            if curl -s http://127.0.0.1:4000/api/v1/health | grep -q "healthy"; then
+              echo "Backend is healthy and ready for k6 load testing."
+              break
+            fi
+            echo "Waiting for backend server on port 4000... ($i/30)"
+            sleep 1
+          done
+
+      - name: Install Grafana k6 Load Testing Engine
+        run: |
+          curl -fsSL https://github.com/grafana/k6/releases/download/v0.54.0/k6-v0.54.0-linux-amd64.tar.gz \
+            | sudo tar -xz --strip-components=1 -C /usr/local/bin k6-v0.54.0-linux-amd64/k6
+          k6 version
+
+      - name: Execute k6 Performance & NFR SLA Benchmark
+        run: k6 run perf/k6-load-test.js
+
+      - name: Upload k6 Performance Report Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-performance-report
+          path: |
+            k6-summary.json
+            k6-report.md
+          retention-days: 14
+
+  # ============================================================================
+  # STAGE 7: CONTAINER SECURITY SCANNING - AQUA TRIVY
+  # ============================================================================
+  trivy-container-scan:
+    name: Trivy Container Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Production Container Image for Security Audit
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: healthclaim-pro:ci-scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Execute Aqua Trivy Container Vulnerability & Config Scan
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/workspace" \
+            aquasec/trivy:0.58.1 image \
+            --format table \
+            --output /workspace/trivy-container-report.txt \
+            --scanners vuln \
+            --severity CRITICAL,HIGH,MEDIUM \
+            --exit-code 0 \
+            healthclaim-pro:ci-scan
+          cat trivy-container-report.txt
+
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/workspace" \
+            aquasec/trivy:0.58.1 image \
+            --format json \
+            --output /workspace/trivy-container-report.json \
+            --scanners vuln \
+            --severity CRITICAL,HIGH,MEDIUM,LOW \
+            --exit-code 0 \
+            healthclaim-pro:ci-scan
+
+      - name: Upload Trivy Container Security Report Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-container-scan-report
+          path: |
+            trivy-container-report.txt
+            trivy-container-report.json
+          retention-days: 14
+
+  # ============================================================================
+  # STAGE 8: CD - BUILD DOCKER IMAGE & PUSH TO AMAZON ECR
   # (Strict Gate: Requires ALL tests and security scans to succeed on 'main')
   # ============================================================================
   build-and-push-ecr:
@@ -329,6 +488,9 @@ jobs:
       - unit-tests-and-coverage
       - playwright-e2e
       - codeql-sast-scan
+      - owasp-zap-dast
+      - k6-performance-test
+      - trivy-container-scan
     permissions:
       id-token: write # Required for AWS OIDC
       contents: read

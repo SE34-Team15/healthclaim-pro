@@ -6,7 +6,7 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat openssl
+RUN apk update && apk upgrade --no-cache && apk add --no-cache libc6-compat openssl
 RUN npm install -g pnpm@10.33.0
 
 # Copy workspace definitions and package files
@@ -37,7 +37,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN apk add --no-cache libc6-compat openssl
+RUN apk update && apk upgrade --no-cache && apk add --no-cache libc6-compat openssl
 
 # Create non-root system user (Least Privilege Security Standard)
 RUN addgroup --system --gid 1001 nodejs && \

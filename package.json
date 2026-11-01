@@ -11,6 +11,7 @@
     "test": "pnpm --filter backend test",
     "test:cov": "pnpm --filter backend test:cov",
     "test:e2e": "playwright test",
+    "test:perf": "k6 run perf/k6-load-test.js",
     "lint": "pnpm -r lint",
     "prepare": "husky"
   },
